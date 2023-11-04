@@ -1,9 +1,9 @@
 import XCTest
 import System
-@testable import SwiftKV
+@testable import CoreLMDB
 
-final class SwiftKVTests: XCTestCase {
-    let path = FilePath(FileManager.default.temporaryDirectory.appendingPathComponent("SwiftKVTests", isDirectory: true))!
+final class CoreLMDBTests: XCTestCase {
+    let path = FilePath(FileManager.default.temporaryDirectory.appendingPathComponent("CoreLMDBTests", isDirectory: true))!
 
     override func setUp() async throws {
         try! FileManager.default.createDirectory(atPath: path.string, withIntermediateDirectories: false)

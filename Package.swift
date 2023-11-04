@@ -3,15 +3,15 @@
 import PackageDescription
 
 let package = Package(
-    name: "SwiftKV",
+    name: "CoreLMDB",
     platforms: [
         .iOS(.v13),
         .macOS(.v12)
     ],
     products: [
         .library(
-            name: "SwiftKV",
-            targets: ["SwiftKV"]
+            name: "CoreLMDB",
+            targets: ["CoreLMDB"]
         ),
     ],
     dependencies: [
@@ -22,12 +22,12 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "SwiftKV",
+            name: "CoreLMDB",
             dependencies: ["CLMDB"]
         ),
         .testTarget(
-            name: "SwiftKVTests",
-            dependencies: ["SwiftKV"]
+            name: "CoreLMDBTests",
+            dependencies: ["CoreLMDB"]
         ),
     ]
 )

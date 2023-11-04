@@ -1,13 +1,13 @@
-# SwiftKV
+# CoreLMDB
 
-SwiftKV is a Swift wrapper for the Lightning Memory-Mapped Database (LMDB). It provides a minimal, yet powerful interface to LMDB, a high-performance, Btree-based database management library.
+CoreLMDB is a Swift wrapper for the Lightning Memory-Mapped Database (LMDB). It provides a minimal, yet powerful interface to LMDB, a high-performance, Btree-based database management library.
 
 ## Usage
 
-Here's a basic example of how to use SwiftKV:
+Here's a basic example of how to use CoreLMDB:
 
 ```swift
-import SwiftKV
+import CoreLMDB
 
 let env = try Environment(path: path)
 let db = try env.read { try Database.open(in: $0) }
@@ -24,15 +24,15 @@ try env.write {
 }
 ```
 
-SwiftKV is a powerful tool that provides a simple and safe interface to LMDB, making it easier to leverage the power of LMDB in your Swift applications.
+CoreLMDB is a powerful tool that provides a simple and safe interface to LMDB, making it easier to leverage the power of LMDB in your Swift applications.
 
 ## Installation
 
-SwiftKV is available as a Swift Package. You can add it to your project by adding the following to your `Package.swift` file:
+CoreLMDB is available as a Swift Package. You can add it to your project by adding the following to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/jadengeller/SwiftKV.git", branch: "main")
+    .package(url: "https://github.com/jadengeller/CoreLMDB.git", branch: "main")
 ]
 ```
 
@@ -44,10 +44,10 @@ LMDB is fully transactional with full ACID semantics, and when the memory map is
 
 Unlike other database mechanisms which require periodic checkpointing or compaction, LMDB requires no maintenance during operation. It tracks free pages within the database and re-uses them for new write operations, preventing unbounded growth in normal use.
 
-## Why SwiftKV?
+## Why CoreLMDB?
 
-SwiftKV is a Swift wrapper for LMDB that emphasizes safety and simplicity. It leverages Swift's type system and noncopyable (move-only) types to provide a safer, more Swift-like interface to LMDB. This ensures that database transactions are managed correctly and helps prevent common errors.
+CoreLMDB is a Swift wrapper for LMDB that emphasizes safety and simplicity. It leverages Swift's type system and noncopyable (move-only) types to provide a safer, more Swift-like interface to LMDB. This ensures that database transactions are managed correctly and helps prevent common errors.
 
-SwiftKV also ensures that your read and write operations are always performed within the correct type of transaction, making your database code easier to understand. It uses Swift types like `UnsafeRawBufferPointer` for a more Swift-friendly API, but it's worth noting that SwiftKV is a low-level interface and does not handle serialization/deserialization of these types for you.
+CoreLMDB also ensures that your read and write operations are always performed within the correct type of transaction, making your database code easier to understand. It uses Swift types like `UnsafeRawBufferPointer` for a more Swift-friendly API, but it's worth noting that CoreLMDB is a low-level interface and does not handle serialization/deserialization of these types for you.
 
-While SwiftKV does not expose every single feature of LMDB, it provides what's needed for most use cases. It's a work-in-progress, and contributions are welcome!
+While CoreLMDB does not expose every single feature of LMDB, it provides what's needed for most use cases. It's a work-in-progress, and contributions are welcome!
