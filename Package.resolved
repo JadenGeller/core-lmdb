@@ -1,0 +1,14 @@
+{
+  "pins" : [
+    {
+      "identity" : "clmdb",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tannerdsilva/CLMDB.git",
+      "state" : {
+        "revision" : "39e2f317c898824777365d5669f6fa7571541893",
+        "version" : "0.9.31"
+      }
+    }
+  ],
+  "version" : 2
+}
