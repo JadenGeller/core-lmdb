@@ -87,6 +87,10 @@ extension Transaction.Read {
         self.txn = txn
         try LMDBError.check(mdb_txn_renew(txn))
     }
+    public func refresh() throws {
+        LMDBError.cannotFail(mdb_txn_reset(txn))
+        try LMDBError.check(mdb_txn_renew(txn))
+    }
 }
 
 extension Environment {
