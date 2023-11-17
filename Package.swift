@@ -13,6 +13,10 @@ let package = Package(
             name: "CoreLMDB",
             targets: ["CoreLMDB"]
         ),
+        .library(
+            name: "CoreLMDBRepresentable",
+            targets: ["CoreLMDBRepresentable"]
+        ),
     ],
     dependencies: [
         .package(
@@ -25,9 +29,13 @@ let package = Package(
             name: "CoreLMDB",
             dependencies: ["CLMDB"]
         ),
+        .target(
+            name: "CoreLMDBRepresentable",
+            dependencies: ["CoreLMDB"]
+        ),
         .testTarget(
             name: "CoreLMDBTests",
-            dependencies: ["CoreLMDB"]
+            dependencies: ["CoreLMDB", "CoreLMDBRepresentable"]
         ),
     ]
 )
