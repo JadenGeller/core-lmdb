@@ -27,19 +27,19 @@ final class EnvironmentTests: XCTestCase {
         try withFreshPath { path in
             try withEnvironment(at: path) { env in
                 let db = try env.withTransaction(.write) { txn in
-                    try DurableSortedDictionary<String, Int32>.Database.open(in: txn)
+                    try Database.open(in: txn)
                 }
                 try env.withTransaction(.write) { txn in
-                    var dict = DurableSortedDictionary(database: db, in: txn)
-                    
-                    dict["jaden"] = 10
-                    dict["sawyer", default: 3] += 1
-                    
-                    dict.merge([("jaden", 5)], uniquingKeysWith: *)
-                    dict["sawyer"] = nil
-
-                    for (key, value) in dict {
-                        print(key, value)
+                    try txn.withDurableSortedDictionary(as: (String.self, Int32.self), for: db) { dict in
+                        dict["jaden"] = 10
+                        dict["sawyer", default: 3] += 1
+                        
+                        dict.merge([("jaden", 5)], uniquingKeysWith: *)
+                        dict["sawyer"] = nil
+                        
+                        for (key, value) in dict {
+                            print(key, value)
+                        }
                     }
                 }
             }

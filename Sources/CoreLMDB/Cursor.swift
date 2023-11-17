@@ -26,6 +26,8 @@ public struct Cursor {
     /// Closes the cursor.
     ///
     /// - Precondition: The cursor's transaction must still be live if it is a write-transaction.
+    /// - Note: If in a write transaction, the cursor may be closed before the transaction ends, but it will otherwise be closed automatically.
+    ///   If in a read transaction, the cursor must be closed explicitly, but it doesn't need to be closed before the transaction ends.
     @inlinable @inline(__always)
     public func close() {
         mdb_cursor_close(unsafeHandle)

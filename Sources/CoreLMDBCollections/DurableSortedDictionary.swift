@@ -1,6 +1,7 @@
 import CoreLMDB
 import CoreLMDBRepresentable
 
+// TODO: Is there any way this could be copy-on-write? It would need to reference the environment
 public struct DurableSortedDictionary<Key: RawBufferRepresentable, Value: RawBufferRepresentable> {
     internal var database: Database
     internal var transaction: Transaction
@@ -40,101 +41,50 @@ extension DurableSortedDictionary {
 }
 
 extension DurableSortedDictionary: BidirectionalCollection {
-    // FIXME: It would be nice if this prevented mutation when the index isn't inout/var
-    public class Index: Comparable {
-        internal var cursor: Cursor
-        internal var isFinished: Bool = false
-        
-        internal init(in dictionary: DurableSortedDictionary) {
-            cursor = try! Cursor(in: dictionary.transaction, for: dictionary.database)
-        }
-        
-        func preconditionFailure() -> Never {
-            Swift.preconditionFailure("Attempting to access Dictionary elements using an invalid index")
-        }
-        
-        var item: Cursor.DataItem {
-            guard let item = try! cursor.get() else { preconditionFailure() }
-            return item
-        }
-        
-        // still could be incompatible if things have changed!
-        public static func assertCompatible(_ lhs: Index, _ rhs: Index) {
-            assert(lhs.cursor.database == rhs.cursor.database, "invalid comparison between indices of separate database")
-            assert(lhs.cursor.transaction == rhs.cursor.transaction, "invalid comparison between indices of separate transaction")
-
-        }
-        
-        public static func ==(lhs: Index, rhs: Index) -> Bool {
-            assertCompatible(lhs, rhs)
-            
-            guard lhs.isFinished == rhs.isFinished else { return false }
-            
-            let (database, transaction) = (lhs.cursor.database, lhs.cursor.transaction)
-            return database.keyOrdering(of: lhs.item.key, rhs.item.key, in: transaction) == .equal
-        }
-        
-        public static func <(lhs: Index, rhs: Index) -> Bool {
-            assertCompatible(lhs, rhs)
-
-            guard lhs.isFinished == rhs.isFinished else { return rhs.isFinished }
-
-            let (database, transaction) = (lhs.cursor.database, lhs.cursor.transaction)
-            return database.keyOrdering(of: lhs.item.key, rhs.item.key, in: transaction) == .ascending
-        }
-        
-        deinit {
-            cursor.close()
-        }
-    }
+    public typealias Index = DatabaseIndex
     public typealias Element = (key: Key, value: Value)
 
     public var startIndex: Index {
-        let index = Index(in: self)
-        try! index.cursor.move(to: .first)
+        let index = DatabaseIndex(for: database, in: transaction)
+        assert(try! index.move(to: .first) != nil)
         return index
     }
     
     public var endIndex: Index {
-        let index = Index(in: self)
-        try! index.cursor.move(to: .last)
-        index.isFinished = true
+        let index = DatabaseIndex(for: database, in: transaction)
+        index.moveToEnd()
         return index
     }
 
     public func index(forKey key: Key) -> Index? {
-        let index = Index(in: self)
-        guard try! index.cursor.move(.exactly, toKey: key) != nil else { return nil }
+        let index = DatabaseIndex(for: database, in: transaction)
+        guard try! index.move(.exactly, toKey: key) != nil else { return nil }
         return index
     }
     
     public subscript(index: Index) -> Element {
-        guard !index.isFinished else { index.preconditionFailure() }
+        guard !index.isEnd else { index.preconditionFailure() }
         let item = index.item
         return try! (item.key(as: Key.self), item.value(as: Value.self))
     }
     
     public func formIndex(after i: inout Index) {
-        precondition(!i.isFinished)
-        if try! i.cursor.move(to: .next) == nil {
-            i.isFinished = true
-        }
+        try! i.move(to: .next)
     }
     
     public func formIndex(before i: inout Index) {
-        guard !i.isFinished else { return i.isFinished = false }
-        precondition(try! i.cursor.move(to: .previous) != nil)
+        try! i.move(to: .previous)
     }
     
     public func index(after i: Index) -> Index {
-        var newIndex = Index(in: self)
+        var newIndex = Index(for: database, in: transaction)
         try! newIndex.cursor.move(.exactly, toKey: i.item.key)
         formIndex(after: &newIndex)
         return newIndex
     }
     
     public func index(before i: Index) -> Index {
-        var newIndex = Index(in: self)
+        var newIndex = Index(for: database, in: transaction)
         try! newIndex.cursor.move(.exactly, toKey: i.item.key)
         formIndex(before: &newIndex)
         return newIndex
@@ -145,9 +95,10 @@ extension DurableSortedDictionary: BidirectionalCollection {
 
 extension DurableSortedDictionary {
     public mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
-        let index = Index(in: self)
-        defer { try! index.cursor.put(key: key, value: value) }
-        return try! index.cursor.move(.exactly, toKey: key)?.value(as: Value.self)
+        try! transaction.withCursor(for: database) { cursor in
+            defer { try! cursor.put(key: key, value: value) }
+            return try! cursor.move(.exactly, toKey: key)?.value(as: Value.self)
+        }
     }
 
     public mutating func merge<S>(_ other: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S : Sequence, S.Element == (Key, Value) {
@@ -191,10 +142,10 @@ extension Transaction {
     public func withDurableSortedDictionary<Key: RawBufferRepresentable, Value: RawBufferRepresentable, Result>(
         as type: (Key.Type, Value.Type),
         for database: Database,
-        _ block: (DurableSortedDictionary<Key, Value>) throws -> Result
+        _ block: (inout DurableSortedDictionary<Key, Value>) throws -> Result
     ) throws -> Result {
-        let dict = DurableSortedDictionary<Key, Value>(for: database, in: self)
-        return try block(dict)
+        var dict = DurableSortedDictionary<Key, Value>(for: database, in: self)
+        return try block(&dict)
     }
 }
 
