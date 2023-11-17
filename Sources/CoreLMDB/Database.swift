@@ -144,6 +144,42 @@ extension UnsafeRawBufferPointer {
     }
 }
 
+// MARK: Comparison
+
+extension Database {
+    public enum Ordering: Hashable, Sendable {
+        case descending
+        case equal
+        case ascending
+        
+        internal init(_ value: Int32) {
+            self = if value > 0 {
+                .descending
+            } else if value == 0 {
+                .equal
+            } else {
+                .ascending
+            }
+        }
+    }
+    public func keyOrdering(of lhs: UnsafeRawBufferPointer, _ rhs: UnsafeRawBufferPointer, in transaction: Transaction) -> Ordering {
+        var lhs = MDB_val(.init(mutating: lhs))
+        var rhs = MDB_val(.init(mutating: rhs))
+        return Ordering(mdb_cmp(transaction.unsafeHandle, unsafeHandle, &lhs, &rhs))
+    }
+    public func duplicateOrdering(of lhs: UnsafeRawBufferPointer, _ rhs: UnsafeRawBufferPointer, in transaction: Transaction) -> Ordering {
+        var lhs = MDB_val(.init(mutating: lhs))
+        var rhs = MDB_val(.init(mutating: rhs))
+        return Ordering(mdb_dcmp(transaction.unsafeHandle, unsafeHandle, &lhs, &rhs))
+    }
+}
+
+extension Database: Equatable {
+    public static func ==(lhs: Database, rhs: Database) -> Bool {
+        lhs.unsafeHandle == rhs.unsafeHandle
+    }
+}
+
 // MARK: Config
 
 extension Database {

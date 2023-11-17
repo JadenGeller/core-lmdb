@@ -118,3 +118,9 @@ extension Transaction {
         mdb_txn_id(unsafeHandle)
     }
 }
+
+extension Transaction: Equatable {
+    public static func ==(lhs: Transaction, rhs: Transaction) -> Bool {
+        lhs.unsafeHandle == rhs.unsafeHandle
+    }
+}

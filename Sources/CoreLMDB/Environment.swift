@@ -125,3 +125,9 @@ extension Environment {
         return dead
     }
 }
+
+extension Environment: Equatable {
+    public static func ==(lhs: Environment, rhs: Environment) -> Bool {
+        lhs.unsafeHandle == rhs.unsafeHandle
+    }
+}

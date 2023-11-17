@@ -2,7 +2,7 @@
 public protocol GuarenteedStableFixedSizeMemoryLayout: RawBufferRepresentable { }
 extension GuarenteedStableFixedSizeMemoryLayout {
     public init(buffer: UnsafeRawBufferPointer) throws {
-        self = buffer.load(as: Self.self)
+        self = buffer.loadUnaligned(as: Self.self)
     }
     public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
         try Swift.withUnsafeBytes(of: self, body)
