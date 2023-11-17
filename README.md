@@ -1,5 +1,7 @@
 # CoreLMDB
 
+*WORK-IN-PROGRESS*: README is currently out-of-date.
+
 CoreLMDB is a Swift wrapper for the Lightning Memory-Mapped Database (LMDB). It provides a minimal, yet powerful interface to LMDB, a high-performance, Btree-based database management library.
 
 ## Usage
