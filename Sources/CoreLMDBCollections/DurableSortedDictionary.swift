@@ -96,7 +96,7 @@ extension DurableSortedDictionary: BidirectionalCollection {
 extension DurableSortedDictionary {
     public mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
         try! transaction.withCursor(for: database) { cursor in
-            defer { try! cursor.put(key: key, value: value) }
+            defer { try! cursor.put(value, atKey: key) }
             return try! cursor.move(.exactly, toKey: key)?.value(as: Value.self)
         }
     }

@@ -240,7 +240,7 @@ extension Cursor {
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Precondition: The cursor's transaction must be a write transaction.
     @inlinable @inline(__always)
-    public func put(key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer, overwrite: Bool = true) throws {
+    public func put(_ value: UnsafeRawBufferPointer, atKey key: UnsafeRawBufferPointer, overwrite: Bool = true) throws {
         var key = MDB_val(.init(mutating: key))
         var value = MDB_val(.init(mutating: value))
         try LMDBError.check(mdb_cursor_put(unsafeHandle, &key, &value, overwrite ? 0 : UInt32(MDB_NOOVERWRITE)))

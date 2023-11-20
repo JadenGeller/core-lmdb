@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "CoreLMDB",
+    name: "core-lmdb",
     platforms: [
         .iOS(.v14),
         .macOS(.v12)

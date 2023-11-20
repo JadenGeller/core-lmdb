@@ -37,10 +37,10 @@ extension Cursor {
 
 extension Cursor {
     @inlinable @inline(__always)
-    public func put<Key: RawBufferRepresentable, Value: RawBufferRepresentable>(key: Key, value: Value, overwrite: Bool = true) throws {
+    public func put<Key: RawBufferRepresentable, Value: RawBufferRepresentable>(_ value: Value, atKey key: Key, overwrite: Bool = true) throws {
         try key.withUnsafeBytes { key in
             try value.withUnsafeBytes { value in
-                try put(key: key, value: value, overwrite: overwrite)
+                try put(value, atKey: key, overwrite: overwrite)
             }
         }
     }
