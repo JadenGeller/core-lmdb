@@ -1,5 +1,6 @@
 public protocol BufferCoderProtocol {
     associatedtype Decoded
+    @discardableResult func scanning(partial buffer: inout Slice<UnsafeRawBufferPointer>) throws -> Slice<UnsafeRawBufferPointer>
     func decoding(partial buffer: inout Slice<UnsafeRawBufferPointer>) throws -> Decoded
     func withEncoding<Result>(of decoded: Decoded, _ body: (UnsafeRawBufferPointer) throws -> Result) throws -> Result
     var underestimatedByteCount: Int { get }
@@ -17,18 +18,23 @@ extension BufferCoderProtocol {
     }
 }
 
-extension MemoryLayout {
+extension MemoryLayout where T: GuarenteedStableFixedSizeMemoryLayout {
     public struct ContiguousArrayBufferCoder: BufferCoderProtocol {
         public var count: Int
         public init(count: Int) {
             self.count = count
         }
         
-        @inlinable @inline(__always)
-        public func decoding(partial buffer: inout Slice<UnsafeRawBufferPointer>) throws -> ContiguousArray<T> {
+        @discardableResult @inlinable @inline(__always)
+        public func scanning(partial buffer: inout Slice<UnsafeRawBufferPointer>) throws -> Slice<UnsafeRawBufferPointer> {
             let endIndex = buffer.index(buffer.startIndex, offsetBy: MemoryLayout.size * count)
             defer { buffer = buffer[endIndex...] }
-            return ContiguousArray(buffer[..<endIndex].bindMemory(to: T.self))
+            return buffer[..<endIndex]
+        }
+        
+        @inlinable @inline(__always)
+        public func decoding(partial buffer: inout Slice<UnsafeRawBufferPointer>) throws -> ContiguousArray<T> {
+            ContiguousArray(try scanning(partial: &buffer).bindMemory(to: T.self))
         }
         
         @inlinable @inline(__always)
@@ -44,11 +50,16 @@ extension MemoryLayout {
     public struct BufferCoder: BufferCoderProtocol {
         public init() {}
         
-        @inlinable @inline(__always)
-        public func decoding(partial buffer: inout Slice<UnsafeRawBufferPointer>) throws -> T {
+        @discardableResult @inlinable @inline(__always)
+        public func scanning(partial buffer: inout Slice<UnsafeRawBufferPointer>) throws -> Slice<UnsafeRawBufferPointer> {
             let endIndex = buffer.index(buffer.startIndex, offsetBy: MemoryLayout.size)
             defer { buffer = buffer[endIndex...] }
-            return buffer[..<endIndex].loadUnaligned(as: T.self)
+            return buffer[..<endIndex]
+        }
+        
+        @inlinable @inline(__always)
+        public func decoding(partial buffer: inout Slice<UnsafeRawBufferPointer>) throws -> T {
+            try scanning(partial: &buffer).loadUnaligned(as: T.self)
         }
         
         @inlinable @inline(__always)
@@ -71,6 +82,14 @@ public struct PackedBufferCoder<First: BufferCoderProtocol, Second: BufferCoderP
     public init(_ first: First, _ second: Second) {
         self.first = first
         self.second = second
+    }
+    
+    @discardableResult @inlinable @inline(__always)
+    public func scanning(partial buffer: inout Slice<UnsafeRawBufferPointer>) throws -> Slice<UnsafeRawBufferPointer> {
+        let first = try first.scanning(partial: &buffer)
+        let second = try second.scanning(partial: &buffer)
+        assert(first.endIndex == second.startIndex) // FIXME: Would be great if protocol was designed so that this weren't necessary
+        return .init(base: first.base, bounds: first.startIndex..<second.endIndex)
     }
     
     @inlinable @inline(__always)
