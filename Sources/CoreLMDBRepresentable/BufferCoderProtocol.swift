@@ -106,3 +106,26 @@ public struct PackedBufferCoder<First: BufferCoderProtocol, Second: BufferCoderP
         return try bytes.withUnsafeBytes(body)
     }
 }
+
+// FIXME: Can this API be improved to be safer?
+// Consumes the entire buffer! Cannot be composed except in the final position
+public struct RawBufferRepresentableCoder<Value: RawBufferRepresentable>: BufferCoderProtocol {
+    @inlinable @inline(__always)
+    public init() {}
+    
+    @discardableResult @inlinable @inline(__always)
+    public func scanning(partial buffer: inout Slice<UnsafeRawBufferPointer>) throws -> Slice<UnsafeRawBufferPointer> {
+        defer { buffer = buffer[buffer.endIndex...] }
+        return buffer
+    }
+    
+    @inlinable @inline(__always)
+    public func decoding(partial buffer: inout Slice<UnsafeRawBufferPointer>) throws -> Value {
+        try .init(buffer: UnsafeRawBufferPointer(rebasing: buffer))
+    }
+    
+    @inlinable @inline(__always)
+    public func withEncoding<Result>(of decoded: Value, _ body: (UnsafeRawBufferPointer) throws -> Result) throws -> Result {
+        try decoded.withUnsafeBytes(body)
+    }
+}
