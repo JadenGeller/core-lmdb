@@ -2,7 +2,7 @@ import Foundation
 
 public protocol RawBufferRepresentable {
     init(buffer: UnsafeRawBufferPointer) throws
-    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R
+    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) throws -> R
 }
 
 extension Data: RawBufferRepresentable {

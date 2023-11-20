@@ -64,16 +64,16 @@ extension Database {
 }
 
 extension Database {
-    public func keyOrdering<Key: RawBufferRepresentable>(of lhs: Key, _ rhs: Key, in transaction: Transaction) -> Ordering {
-        lhs.withUnsafeBytes { lhs in
-            rhs.withUnsafeBytes { rhs in
+    public func keyOrdering<Key: RawBufferRepresentable>(of lhs: Key, _ rhs: Key, in transaction: Transaction) throws -> Ordering {
+        try lhs.withUnsafeBytes { lhs in
+            try rhs.withUnsafeBytes { rhs in
                 keyOrdering(of: lhs, rhs, in: transaction)
             }
         }
     }
-    public func duplicateOrdering<Value: RawBufferRepresentable>(of lhs: Value, _ rhs: Value, in transaction: Transaction) -> Ordering {
-        lhs.withUnsafeBytes { lhs in
-            rhs.withUnsafeBytes { rhs in
+    public func duplicateOrdering<Value: RawBufferRepresentable>(of lhs: Value, _ rhs: Value, in transaction: Transaction) throws -> Ordering {
+        try lhs.withUnsafeBytes { lhs in
+            try rhs.withUnsafeBytes { rhs in
                 duplicateOrdering(of: lhs, rhs, in: transaction)
             }
         }

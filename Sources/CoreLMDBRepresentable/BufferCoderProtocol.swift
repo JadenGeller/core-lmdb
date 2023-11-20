@@ -8,7 +8,7 @@ extension BufferCoderProtocol {
     @inlinable @inline(__always)
     public func decoding(_ buffer: UnsafeRawBufferPointer) throws -> Decoded {
         var buffer = buffer[...]
-        defer { assert(buffer.isEmpty) }
+        defer { assert(buffer.isEmpty) } // FIXME: This behavior is inconsistent with elsewhere
         return try decoding(partial: &buffer)
     }
     @inlinable @inline(__always)
