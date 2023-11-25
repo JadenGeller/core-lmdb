@@ -120,7 +120,7 @@ extension Cursor {
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     /// - Note: If `target` is `.duplicate`, the `key` returned will not be valid—only the `value` will be. If you need the key as well, use `get()`.
     @discardableResult @inlinable @inline(__always)
-    public func move(to position: AbsolutePosition, _ target: Target = .key) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
+    public func get(_ position: AbsolutePosition, target: Target = .key) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
         let operation = switch (position, target) {
         case (.first, .key):
             MDB_FIRST
@@ -148,7 +148,7 @@ extension Cursor {
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     @discardableResult @inlinable @inline(__always)
-    public func move(to position: RelativePosition, _ target: Target? = nil) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
+    public func get(_ position: RelativePosition, target: Target? = nil) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
         let operation = switch (position, target) {
         case (.next, nil):
             MDB_NEXT
@@ -174,14 +174,14 @@ extension Cursor {
     /// Moves the cursor to a specified key, with an optional duplicate value, using the specified precision and retrieves the key and value at that position.
     ///
     /// - Parameters:
-    ///   - precision: The precision of the move operation, either `.exactly` for an exact match or `.nearby` for the nearest match.
     ///   - key: The key to move the cursor to, passed as `UnsafeRawBufferPointer`.
     ///   - value: An optional duplicate value to move the cursor to, passed as `UnsafeRawBufferPointer`. If `nil`, only the key is considered.
+    ///   - precision: The precision of the move operation, either `.exactly` for an exact match or `.nearby` for the nearest match.
     /// - Returns: A pair containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     @discardableResult @inlinable @inline(__always)
-    public func move(_ precision: Precision, toKey key: UnsafeRawBufferPointer, withDuplicateValue value: UnsafeRawBufferPointer? = nil) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
+    public func get(atKey key: UnsafeRawBufferPointer, duplicateValue value: UnsafeRawBufferPointer? = nil, precision: Precision = .exactly) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
         let operation: MDB_cursor_op
         switch (precision, value) {
         case (.exactly, .none):
