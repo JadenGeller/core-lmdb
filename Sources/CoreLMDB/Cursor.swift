@@ -62,11 +62,11 @@ extension Cursor {
     /// Represents the absolute position to which a cursor can move.
     public enum AbsolutePosition {
         /// Moves the cursor to the first key or first duplicate of the current key, depending on `Target`.
-        /// - Note: If moving to `Target.duplicate`, only the `value` returned will be valid, not the `key`.
+        /// - Note: If moving to `Target.value`, only the `value` returned will be valid, not the `key`.
         case first
         
         /// Moves the cursor to the last key or last duplicate of the current key, depending on `Target`.
-        /// - Note: If moving to `Target.duplicate`, only the `value` returned will be valid, not the `key`.
+        /// - Note: If moving to `Target.value`, only the `value` returned will be valid, not the `key`.
         case last
     }
     
@@ -94,7 +94,7 @@ extension Cursor {
         /// In move operations, directs the cursor through duplicates of the current key.
         /// - Note: If moving to `AbsolutePosition.first` or `AbsolutePosition.last`,
         /// only the `value` returned will be valid, not the `key`.
-        case duplicate
+        case value
     }
     
     /// Represents the precision of a cursor move operation.
@@ -109,6 +109,8 @@ extension Cursor {
     }
 }
 
+// TODO: Provide methods to read key without value by passing `nil` for value?
+
 extension Cursor {
     /// Moves the cursor to an absolute position within the database and retrieves the key and value at that position.
     ///
@@ -118,18 +120,14 @@ extension Cursor {
     /// - Returns: A  pair containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
-    /// - Note: If `target` is `.duplicate`, the `key` returned will not be valid—only the `value` will be. If you need the key as well, use `get()`.
+    /// - Note: If `target` is `.value`, the `key` returned will not be valid—only the `value` will be. If you need the key as well, use `get()`.
     @discardableResult @inlinable @inline(__always)
     public func get(_ position: AbsolutePosition, target: Target = .key) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
         let operation = switch (position, target) {
-        case (.first, .key):
-            MDB_FIRST
-        case (.first, .duplicate):
-            MDB_FIRST_DUP
-        case (.last, .key):
-            MDB_LAST
-        case (.last, .duplicate):
-            MDB_LAST_DUP
+        case (.first, .key):   MDB_FIRST
+        case (.first, .value): MDB_FIRST_DUP
+        case (.last, .key):    MDB_LAST
+        case (.last, .value):  MDB_LAST_DUP
         }
         var key = MDB_val()
         var value = MDB_val()
@@ -143,25 +141,19 @@ extension Cursor {
     ///
     /// - Parameters:
     ///   - position: The relative position to move the cursor to.
-    ///   - target: An optional target of the move operation, which can be `.key` or `.duplicate`. If `nil`, the cursor moves to the next or previous entry without considering duplicates.
+    ///   - target: An optional target of the move operation, which can be `.key` or `.value`. If `nil`, the cursor moves to the next or previous entry without considering duplicates.
     /// - Returns: A pair containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     @discardableResult @inlinable @inline(__always)
     public func get(_ position: RelativePosition, target: Target? = nil) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
         let operation = switch (position, target) {
-        case (.next, nil):
-            MDB_NEXT
-        case (.next, .key):
-            MDB_NEXT_NODUP
-        case (.next, .duplicate):
-            MDB_NEXT_DUP
-        case (.previous, nil):
-            MDB_PREV
-        case (.previous, .key):
-            MDB_PREV_NODUP
-        case (.previous, .duplicate):
-            MDB_PREV_DUP
+        case (.next, nil):        MDB_NEXT
+        case (.next, .key):       MDB_NEXT_NODUP
+        case (.next, .value):     MDB_NEXT_DUP
+        case (.previous, nil):    MDB_PREV
+        case (.previous, .key):   MDB_PREV_NODUP
+        case (.previous, .value): MDB_PREV_DUP
         }
         var key = MDB_val()
         var value = MDB_val()
@@ -181,17 +173,13 @@ extension Cursor {
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     @discardableResult @inlinable @inline(__always)
-    public func get(atKey key: UnsafeRawBufferPointer, duplicateValue value: UnsafeRawBufferPointer? = nil, precision: Precision = .exactly) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
-        let operation: MDB_cursor_op
-        switch (precision, value) {
-        case (.exactly, .none):
-            operation = MDB_SET
-        case (.exactly, .some):
-            operation = MDB_GET_BOTH
-        case (.nearby, .none):
-            operation = MDB_SET_RANGE
-        case (.nearby, .some):
-            operation = MDB_GET_BOTH_RANGE
+    public func get(atKey key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer? = nil, precision: Precision = .exactly) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
+        // FIXME: Clarify behavior if value is specified for non-DUPSORT database
+        let operation = switch (precision, value) {
+        case (.exactly, .none): MDB_SET
+        case (.exactly, .some): MDB_GET_BOTH
+        case (.nearby, .none):  MDB_SET_RANGE
+        case (.nearby, .some):  MDB_GET_BOTH_RANGE
         }
         var key = MDB_val(.init(mutating: key))
         var value = value.map { MDB_val(.init(mutating: $0)) } ?? .init()
@@ -237,13 +225,13 @@ extension Cursor {
     /// Deletes data at the cursor's current position.
     ///
     /// - Parameters:
-    ///   - includingDuplicateValues: If true, delete all duplicate data items for the current key. Otherwise, only delete the current data item.
+    ///   - target: If multiple values are set for the given key, you can either delete a single `value` or the entire `key`, deleting all values.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Precondition: The transaction must be a write transaction.
     /// - Note: If the key does not exist in the database, the function will throw `LMDBError.notFound`.
     @inlinable @inline(__always)
-    public func delete(includingDuplicateValues: Bool = false) throws {
-        try LMDBError.check(mdb_cursor_del(unsafeHandle, includingDuplicateValues ? UInt32(MDB_NODUPDATA) : 0))
+    public func delete(target: Target = .value) throws {
+        try LMDBError.check(mdb_cursor_del(unsafeHandle, UInt32(target == .key ? MDB_NODUPDATA : 0)))
     }
 }
 

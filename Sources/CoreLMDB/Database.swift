@@ -122,7 +122,8 @@ extension Database {
     /// - Precondition: The transaction must be a write transaction.
     /// - Note: If the key does not exist in the database, the function will throw `LMDBError.notFound`.
     @inlinable @inline(__always)
-    public func delete(atKey key: UnsafeRawBufferPointer, withDuplicateValue value: UnsafeRawBufferPointer? = nil, in transaction: Transaction) throws {
+    public func delete(atKey key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer? = nil, in transaction: Transaction) throws {
+        // FIXME: Clarify behavior if value is specified for non-DUPSORT database
         var key = MDB_val(.init(mutating: key))
         var value = value.map { MDB_val(.init(mutating: $0)) } ?? .init()
         try LMDBError.check(mdb_del(transaction.unsafeHandle, unsafeHandle, &key, &value))
