@@ -110,30 +110,17 @@ extension Cursor {
 }
 
 extension Cursor {
-    public struct DataItem {
-        public var key: UnsafeRawBufferPointer
-        public var value: UnsafeRawBufferPointer
-        
-        @inlinable @inline(__always)
-        internal init(key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer) {
-            self.key = key
-            self.value = value
-        }
-    }
-}
-
-extension Cursor {
     /// Moves the cursor to an absolute position within the database and retrieves the key and value at that position.
     ///
     /// - Parameters:
     ///   - position: The absolute position to move the cursor to.
     ///   - target: The target of the move operation, either a key or a duplicate value of the current key. Defaults to `.key`.
-    /// - Returns: A `DataItem` containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
+    /// - Returns: A  pair containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     /// - Note: If `target` is `.duplicate`, the `key` returned will not be valid—only the `value` will be. If you need the key as well, use `get()`.
     @discardableResult @inlinable @inline(__always)
-    public func move(to position: AbsolutePosition, _ target: Target = .key) throws -> DataItem? {
+    public func move(to position: AbsolutePosition, _ target: Target = .key) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
         let operation = switch (position, target) {
         case (.first, .key):
             MDB_FIRST
@@ -148,7 +135,7 @@ extension Cursor {
         var value = MDB_val()
         return try LMDBError.nilIfNotFound {
             try LMDBError.check(mdb_cursor_get(unsafeHandle, &key, &value, operation))
-            return DataItem(key: .init(key), value: .init(value))
+            return (key: .init(key), value: .init(value))
         }
     }
     
@@ -157,11 +144,11 @@ extension Cursor {
     /// - Parameters:
     ///   - position: The relative position to move the cursor to.
     ///   - target: An optional target of the move operation, which can be `.key` or `.duplicate`. If `nil`, the cursor moves to the next or previous entry without considering duplicates.
-    /// - Returns: A `DataItem` containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
+    /// - Returns: A pair containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     @discardableResult @inlinable @inline(__always)
-    public func move(to position: RelativePosition, _ target: Target? = nil) throws -> DataItem? {
+    public func move(to position: RelativePosition, _ target: Target? = nil) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
         let operation = switch (position, target) {
         case (.next, nil):
             MDB_NEXT
@@ -180,7 +167,7 @@ extension Cursor {
         var value = MDB_val()
         return try LMDBError.nilIfNotFound {
             try LMDBError.check(mdb_cursor_get(unsafeHandle, &key, &value, operation))
-            return DataItem(key: .init(key), value: .init(value))
+            return (key: .init(key), value: .init(value))
         }
     }
     
@@ -190,11 +177,11 @@ extension Cursor {
     ///   - precision: The precision of the move operation, either `.exactly` for an exact match or `.nearby` for the nearest match.
     ///   - key: The key to move the cursor to, passed as `UnsafeRawBufferPointer`.
     ///   - value: An optional duplicate value to move the cursor to, passed as `UnsafeRawBufferPointer`. If `nil`, only the key is considered.
-    /// - Returns: A `DataItem` containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
+    /// - Returns: A pair containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     @discardableResult @inlinable @inline(__always)
-    public func move(_ precision: Precision, toKey key: UnsafeRawBufferPointer, withDuplicateValue value: UnsafeRawBufferPointer? = nil) throws -> DataItem? {
+    public func move(_ precision: Precision, toKey key: UnsafeRawBufferPointer, withDuplicateValue value: UnsafeRawBufferPointer? = nil) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
         let operation: MDB_cursor_op
         switch (precision, value) {
         case (.exactly, .none):
@@ -210,7 +197,7 @@ extension Cursor {
         var value = value.map { MDB_val(.init(mutating: $0)) } ?? .init()
         return try LMDBError.nilIfNotFound {
             try LMDBError.check(mdb_cursor_get(unsafeHandle, &key, &value, operation))
-            return DataItem(key: .init(key), value: .init(value))
+            return (key: .init(key), value: .init(value))
         }
     }
 }
@@ -218,16 +205,16 @@ extension Cursor {
 extension Cursor {
     /// Retrieves a key/data pair into the database at the cursor's current position.
     ///
-    /// - Returns: A `DataItem` containing the key and value `UnsafeRawBufferPointer` at the cursor's current position, or `nil` if not found.
+    /// - Returns: A pair containing the key and value `UnsafeRawBufferPointer` at the cursor's current position, or `nil` if not found.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     @inlinable @inline(__always)
-    public func get() throws -> DataItem? {
+    public func get() throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
         var key = MDB_val()
         var value = MDB_val()
         return try LMDBError.nilIfNotFound {
             try LMDBError.check(mdb_cursor_get(unsafeHandle, &key, &value, MDB_GET_CURRENT))
-            return DataItem(key: .init(key), value: .init(value))
+            return (key: .init(key), value: .init(value))
         }
     }
     
