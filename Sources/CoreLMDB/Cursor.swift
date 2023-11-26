@@ -172,11 +172,12 @@ extension Cursor {
     /// - Returns: A pair containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
+    /// - Note: The `value` is ingnored if precision is `exactly` and the database doesn't have duplicate values.
     @discardableResult @inlinable @inline(__always)
     public func get(atKey key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer? = nil, precision: Precision = .exactly) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
         // FIXME: Clarify behavior if value is specified for non-DUPSORT database
         let operation = switch (precision, value) {
-        case (.exactly, .none): MDB_SET
+        case (.exactly, .none): MDB_SET_KEY
         case (.exactly, .some): MDB_GET_BOTH
         case (.nearby, .none):  MDB_SET_RANGE
         case (.nearby, .some):  MDB_GET_BOTH_RANGE
