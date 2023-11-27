@@ -1,17 +1,25 @@
 import CLMDB
 
 /// An individual database in the environment.
-public struct Database {
+public struct Database<KeyCoder: ByteEncoder, ValueCoder: ByteCoder> {
     /// The underlying LMDB database handle.
     @usableFromInline
-    internal var unsafeHandle: MDB_dbi
+    internal let unsafeHandle: MDB_dbi
     
+    /// The type of `DatabaseSchema` associated with this database.
+    public typealias Schema = DatabaseSchema<KeyCoder, ValueCoder>
+    
+    /// The `Schema` to use to encode and decode keys and values in the Database.
+    public let schema: Schema
+        
     /// Initializes an already open database from the given LMDB database handle.
     ///
     /// - Parameter unsafeHandle: An `MDB_dbi` representing the LMDB database handle.
+    /// - Parameter schema: The `Schema` to use to encode and decode keys and values.
     @inlinable @inline(__always)
-    internal init(unsafeHandle: MDB_dbi) {
+    internal init(unsafeHandle: MDB_dbi, schema: Schema) {
         self.unsafeHandle = unsafeHandle
+        self.schema = schema
     }
     
     /// Opens a database in the environment, creating it if it does not already exist.
@@ -19,6 +27,7 @@ public struct Database {
     /// - Parameters:
     ///   - name: The name of the database to open. If `nil`, the default database is used.
     ///   - config: Configuration options for the database.
+    ///   - schema: Schema for encoding and decoding keys and values in the database.
     ///   - transaction: The transaction within which to open the database.
     ///
     /// - Returns: The open database.
@@ -28,11 +37,11 @@ public struct Database {
     /// - Warning: This function must not be called from multiple concurrent transactions in the same process.
     ///   A transaction that uses this function must finish (either commit or abort) before any other transaction in the process may use this function.
     @inlinable @inline(__always)
-    public static func `open`(_ name: String? = nil, config: Database.Config = .init(), in transaction: Transaction) throws -> Database {
+    public static func `open`(_ name: String? = nil, config: DatabaseConfig = .init(), schema: Schema, in transaction: Transaction) throws -> Database {
         try name.withCStringOrNil { name in
             var handle = MDB_dbi()
             try LMDBError.check(mdb_dbi_open(transaction.unsafeHandle, name, UInt32(config.rawValue | MDB_CREATE), &handle))
-            return .init(unsafeHandle: handle)
+            return .init(unsafeHandle: handle, schema: schema)
         }
     }
     
@@ -67,7 +76,7 @@ public struct Database {
     /// - Returns: A `Database.Config` struct representing the configuration with which the database was opened.
     /// - Throws: An `LMDBError` if the configuration flags could not be retrieved.
     @inlinable @inline(__always)
-    public func config(in transaction: Transaction) throws -> Database.Config {
+    public func config(in transaction: Transaction) throws -> DatabaseConfig {
         var rawValue: UInt32 = 0
         try LMDBError.check(mdb_dbi_flags(transaction.unsafeHandle, unsafeHandle, &rawValue))
         return .init(rawValue: Int32(rawValue))
@@ -80,53 +89,64 @@ extension Database {
     /// Retrieves the data associated with a given key within a transaction.
     ///
     /// - Parameters:
-    ///   - key: The key for which to retrieve the data, passed as `UnsafeRawBufferPointer`.
+    ///   - key: The key for which to retrieve the data.
     ///   - transaction: The transaction within which the data retrieval should occur.
-    /// - Returns: An optional `UnsafeRawBufferPointer` containing the data associated with the key if it exists; otherwise, `nil`.
+    /// - Returns: An optional value associated with the key if it exists; otherwise, `nil`.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
-    @inlinable @inline(__always)
-    public func get(atKey key: UnsafeRawBufferPointer, in transaction: Transaction) throws -> UnsafeRawBufferPointer? {
-        var key = MDB_val(.init(mutating: key))
-        var value = MDB_val()
-        return try LMDBError.nilIfNotFound {
-            try LMDBError.check(mdb_get(transaction.unsafeHandle, unsafeHandle, &key, &value))
-            return .init(value)
+    ///   You usually don't need to worry about this, unless you're using a decoder like `RawByteCoder` that exposes the buffer.
+    @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    public func get(atKey key: KeyCoder.Input, in transaction: Transaction) throws -> ValueCoder.Output? {
+        try schema.keyCoder.withEncoding(of: key) { key in
+            var key = MDB_val(.init(mutating: key))
+            var value = MDB_val()
+            return try LMDBError.nilIfNotFound {
+                try LMDBError.check(mdb_get(transaction.unsafeHandle, unsafeHandle, &key, &value))
+                return try schema.valueCoder.decoding(.init(value))
+            }
         }
     }
 
     /// Stores a key/data pair in the database within a transaction.
     ///
     /// - Parameters:
-    ///   - value: The data to store, passed as `UnsafeRawBufferPointer`.
-    ///   - key: The key under which to store the data, passed as `UnsafeRawBufferPointer`.
+    ///   - value: The data to store.
+    ///   - key: The key under which to store the data.
     ///   - overwrite: A Boolean value that determines whether to overwrite an existing value for a key. Defaults to `true`.
     ///   - transaction: The transaction within which the data storage should occur.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Precondition: The transaction must be a write transaction.
     /// - Note: If `overwrite` is set to `false` and the key already exists, the function will throw `LMDBError.keyExist`.
-    @inlinable @inline(__always)
-    public func put(_ value: UnsafeRawBufferPointer, atKey key: UnsafeRawBufferPointer, overwrite: Bool = true, in transaction: Transaction) throws {
-        var key = MDB_val(.init(mutating: key))
-        var value = MDB_val(.init(mutating: value))
-        try LMDBError.check(mdb_put(transaction.unsafeHandle, unsafeHandle, &key, &value, overwrite ? 0 : UInt32(MDB_NOOVERWRITE)))
+    @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    public func put(_ value: ValueCoder.Input, atKey key: KeyCoder.Input, overwrite: Bool = true, in transaction: Transaction) throws {
+        try schema.keyCoder.withEncoding(of: key) { key in
+            try schema.valueCoder.withEncoding(of: value) { value in
+                var key = MDB_val(.init(mutating: key))
+                var value = MDB_val(.init(mutating: value))
+                try LMDBError.check(mdb_put(transaction.unsafeHandle, unsafeHandle, &key, &value, overwrite ? 0 : UInt32(MDB_NOOVERWRITE)))
+            }
+        }
     }
     
     /// Deletes the data associated with a given key within a transaction.
     ///
     /// - Parameters:
-    ///   - key: The key for which to delete the data, passed as `UnsafeRawBufferPointer`.
+    ///   - key: The key for which to delete the data.
     ///   - value: The value to delete if the database supports sorted duplicates. If `nil`, all values for the given key will be deleted.
     ///   - transaction: The transaction within which the deletion should occur.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Precondition: The transaction must be a write transaction.
     /// - Note: If the key does not exist in the database, the function will throw `LMDBError.notFound`.
-    @inlinable @inline(__always)
-    public func delete(atKey key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer? = nil, in transaction: Transaction) throws {
+    @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    public func delete(atKey key: KeyCoder.Input, value: ValueCoder.Input? = nil, in transaction: Transaction) throws {
         // FIXME: Clarify behavior if value is specified for non-DUPSORT database
-        var key = MDB_val(.init(mutating: key))
-        var value = value.map { MDB_val(.init(mutating: $0)) } ?? .init()
-        try LMDBError.check(mdb_del(transaction.unsafeHandle, unsafeHandle, &key, &value))
+        try schema.keyCoder.withEncoding(of: key) { key in
+            try schema.valueCoder.withEncodingOrNil(of: value) { value in
+                var key = MDB_val(.init(mutating: key))
+                var value = value.map { MDB_val(.init(mutating: $0)) } ?? .init()
+                try LMDBError.check(mdb_del(transaction.unsafeHandle, unsafeHandle, &key, &value))
+            }
+        }
     }
 }
 
@@ -163,15 +183,23 @@ extension Database {
             }
         }
     }
-    public func keyOrdering(of lhs: UnsafeRawBufferPointer, _ rhs: UnsafeRawBufferPointer, in transaction: Transaction) -> Ordering {
-        var lhs = MDB_val(.init(mutating: lhs))
-        var rhs = MDB_val(.init(mutating: rhs))
-        return Ordering(mdb_cmp(transaction.unsafeHandle, unsafeHandle, &lhs, &rhs))
+    public func keyOrdering(of lhs: KeyCoder.Input, _ rhs: KeyCoder.Input, in transaction: Transaction) throws -> Ordering {
+        try schema.keyCoder.withEncoding(of: lhs) { lhs in
+            try schema.keyCoder.withEncoding(of: rhs) { rhs in
+                var lhs = MDB_val(.init(mutating: lhs))
+                var rhs = MDB_val(.init(mutating: rhs))
+                return Ordering(mdb_cmp(transaction.unsafeHandle, unsafeHandle, &lhs, &rhs))
+            }
+        }
     }
-    public func duplicateOrdering(of lhs: UnsafeRawBufferPointer, _ rhs: UnsafeRawBufferPointer, in transaction: Transaction) -> Ordering {
-        var lhs = MDB_val(.init(mutating: lhs))
-        var rhs = MDB_val(.init(mutating: rhs))
-        return Ordering(mdb_dcmp(transaction.unsafeHandle, unsafeHandle, &lhs, &rhs))
+    public func duplicateOrdering(of lhs: ValueCoder.Input, _ rhs: ValueCoder.Input, in transaction: Transaction) throws -> Ordering {
+        try schema.valueCoder.withEncoding(of: lhs) { lhs in
+            try schema.valueCoder.withEncoding(of: rhs) { rhs in
+                var lhs = MDB_val(.init(mutating: lhs))
+                var rhs = MDB_val(.init(mutating: rhs))
+                return Ordering(mdb_dcmp(transaction.unsafeHandle, unsafeHandle, &lhs, &rhs))
+            }
+        }
     }
 }
 
@@ -180,146 +208,6 @@ extension Database: Equatable {
         lhs.unsafeHandle == rhs.unsafeHandle
     }
 }
-
-// MARK: Config
-
-extension Database {
-    /// Represents the configuration for a database within an LMDB environment.
-    public struct Config: Hashable, Sendable {
-        /// Represents the sort order for keys and duplicate values in the database.
-        public enum SortOrder: Hashable, Sendable {
-            /// Sorted in standard lexicographic order.
-            case standard
-            
-            /// Sorted in reverse lexicographic order.
-            case reverse
-            
-            /// Sorted as binary integers in native byte order.
-            ///
-            /// - Note: Keys must all be the same size.
-            case integer
-        }
-        
-        /// Represents the configuration for handling duplicate keys in the database.
-        public struct DuplicateHandling: Hashable, Sendable {
-            /// The sort order for duplicate values.
-            public var sortOrder: SortOrder
-            
-            /// Indicates whether all duplicate values have the same size, allowing for further optimizations in storage and retrieval.
-            ///
-            /// - Tip: If true, cursor operations may be used to retrieve multiple items at once.
-            public var fixedSize: Bool
-            
-            /// Initializes a new configuration for handling duplicate keys.
-            /// - Parameters:
-            ///   - sortOrder: The sort order for duplicate values.
-            ///   - fixedSize: A Boolean value indicating whether all duplicate values have the same size.
-            @inlinable @inline(__always)
-            public init(sortOrder: SortOrder = .standard, fixedSize: Bool = false) {
-                self.sortOrder = sortOrder
-                self.fixedSize = fixedSize
-            }
-        }
-        
-        /// The sort order for keys in the database.
-        public var sortOrder: SortOrder
-        /// The configuration for handling duplicate keys, if duplicates are allowed.
-        ///
-        /// - Note: If duplicates are allowed, the maximum data size is limited to the maximum key size.
-        public var duplicateHandling: DuplicateHandling?
-        
-        /// Initializes a new database configuration with the specified key sorting and duplicate handling options.
-        /// - Parameters:
-        ///   - sortOrder: The sort order for keys in the database.
-        ///   - duplicateConfiguration: An optional configuration for handling duplicate keys.
-        /// - Throws: An error if an invalid configuration is provided.
-        @inlinable @inline(__always)
-        public init(sortOrder: SortOrder = .standard, duplicateHandling: DuplicateHandling? = nil) {
-            self.sortOrder = sortOrder
-            self.duplicateHandling = duplicateHandling
-        }
-    }
-}
-
-extension Database.Config.SortOrder {
-    @inlinable @inline(__always)
-    internal var rawKeyValue: Int32 {
-        switch self {
-        case .reverse:
-            return MDB_REVERSEKEY
-        case .integer:
-            return MDB_INTEGERKEY
-        case .standard:
-            return 0
-        }
-    }
-    
-    @inlinable @inline(__always)
-    internal init(rawKeyValue: Int32) {
-        if rawKeyValue & MDB_REVERSEKEY != 0 {
-            self = .reverse
-        } else if rawKeyValue & MDB_INTEGERKEY != 0 {
-            self = .integer
-        } else {
-            self = .standard
-        }
-    }
-
-    @inlinable @inline(__always)
-    internal var rawDupValue: Int32 {
-        switch self {
-        case .reverse:
-            return MDB_REVERSEDUP
-        case .integer:
-            return MDB_INTEGERDUP
-        case .standard:
-            return 0
-        }
-    }
-
-    @inlinable @inline(__always)
-    internal init(rawDupValue: Int32) {
-        if rawDupValue & MDB_REVERSEDUP != 0 {
-            self = .reverse
-        } else if rawDupValue & MDB_INTEGERDUP != 0 {
-            self = .integer
-        } else {
-            self = .standard
-        }
-    }
-}
-
-extension Database.Config.DuplicateHandling {
-    @inlinable @inline(__always)
-    internal var rawValue: Int32 {
-        MDB_DUPSORT | sortOrder.rawDupValue | (fixedSize ? MDB_DUPFIXED : 0)
-    }
-
-    @inlinable @inline(__always)
-    internal init?(rawValue: Int32) {
-        guard rawValue & MDB_DUPSORT != 0 else { return nil }
-        self.init(
-            sortOrder: Database.Config.SortOrder(rawDupValue: rawValue),
-            fixedSize: rawValue & MDB_DUPFIXED != 0
-        )
-    }
-}
-
-extension Database.Config: RawRepresentable {
-    @inlinable @inline(__always)
-    public var rawValue: Int32 {
-        sortOrder.rawKeyValue | (duplicateHandling?.rawValue ?? 0)
-    }
-
-    @inlinable @inline(__always)
-    public init(rawValue: Int32) {
-        self.init(
-            sortOrder: .init(rawKeyValue: rawValue),
-            duplicateHandling: .init(rawValue: rawValue)
-        )
-    }
-}
-
 
 // MARK: Utils
 

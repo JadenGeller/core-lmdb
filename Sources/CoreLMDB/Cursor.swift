@@ -1,15 +1,22 @@
 import CLMDB
 
 /// A cursor for navigating through a database.
-public struct Cursor {
+public struct Cursor<KeyCoder: ByteCoder, ValueCoder: ByteCoder> {
+    /// The type of database with `Schema` compatible with this cursor.
+    public typealias Database = CoreLMDB.Database<KeyCoder, ValueCoder>
+    
     /// The underlying LMDB cursor handle.
     @usableFromInline
     internal var unsafeHandle: OpaquePointer?
     
+    /// The `Schema` to use to encode and decode keys and values in the Database.
+    public let schema: Database.Schema
+
     /// Creates a cursor for a given transaction and database.
     ///
     /// - Parameters:
     ///   - database: The database for which to create the cursor.
+    ///   - schema: The `Schema` to use to encode and decode keys and values.
     ///   - transaction: The transaction within which to create the cursor.
     ///
     /// - Throws: An `LMDBError` if the cursor could not be created.
@@ -17,10 +24,11 @@ public struct Cursor {
     ///   If in a write transaction, the cursor may be closed before the transaction ends, but it will otherwise be closed automatically.
     ///   If in a read transaction, the cursor must be closed explicitly, but it doesn't need to be closed before the transaction ends.
     @inlinable @inline(__always)
-    public init(for database: Database, in transaction: Transaction) throws {
+    public init(for database: Database, schema: Database.Schema, in transaction: Transaction) throws {
         var cursor: OpaquePointer?
         try LMDBError.check(mdb_cursor_open(transaction.unsafeHandle, database.unsafeHandle, &cursor))
         self.unsafeHandle = cursor
+        self.schema = schema
     }
     
     /// Closes the cursor.
@@ -54,58 +62,7 @@ extension Cursor {
     /// The database associated with the cursor.
     @inlinable @inline(__always)
     public var database: Database {
-        Database(unsafeHandle: mdb_cursor_dbi(unsafeHandle))
-    }
-}
-
-extension Cursor {
-    /// Represents the absolute position to which a cursor can move.
-    public enum AbsolutePosition {
-        /// Moves the cursor to the first key or first duplicate of the current key, depending on `Target`.
-        /// - Note: If moving to `Target.value`, only the `value` returned will be valid, not the `key`.
-        case first
-        
-        /// Moves the cursor to the last key or last duplicate of the current key, depending on `Target`.
-        /// - Note: If moving to `Target.value`, only the `value` returned will be valid, not the `key`.
-        case last
-    }
-    
-    /// Represents the relative position to which a cursor can move.
-    public enum RelativePosition {
-        /// Moves the cursor to the next key or duplicate of the current key, depending on `Target`.
-        /// If `Target` is not specified, moves to next duplicate if available, otherwise next key.
-        case next
-        
-        /// Moves the cursor to the previous key or duplicate of the current key, depending on `Target`.
-        /// If `Target` is not specified, moves to next duplicate if available, otherwise next key.
-        /// - Note: If moving to `Target.key`, the value will be the first duplicate value for that key, not the last.
-        case previous
-    }
-    
-    /// Represents the target of a cursor move operation.
-    public enum Target {
-        /// Targets unique keys in the database.
-        /// In move operations, directs the cursor to unique keys, bypassing any duplicates.
-        /// - Note: If the key has duplicate values, moving a `RelativePosition`—both `.next` and `.previous`
-        ///   will always move to the first duplicate value for that key.
-        case key
-        
-        /// Targets duplicate values under the current key.
-        /// In move operations, directs the cursor through duplicates of the current key.
-        /// - Note: If moving to `AbsolutePosition.first` or `AbsolutePosition.last`,
-        /// only the `value` returned will be valid, not the `key`.
-        case value
-    }
-    
-    /// Represents the precision of a cursor move operation.
-    public enum Precision {
-        /// The exact key or key-value pair.
-        /// The cursor will move to the exact key or key-value pair if it exists in the database.
-        case exactly
-        
-        /// The nearest key or key-value pair if an exact match is not found.
-        /// The cursor will move to the nearest key or key-value pair that is greater than or equal to the specified key or key-value pair.
-        case nearby
+        Database(unsafeHandle: mdb_cursor_dbi(unsafeHandle), schema: schema)
     }
 }
 
@@ -117,12 +74,13 @@ extension Cursor {
     /// - Parameters:
     ///   - position: The absolute position to move the cursor to.
     ///   - target: The target of the move operation, either a key or a duplicate value of the current key. Defaults to `.key`.
-    /// - Returns: A  pair containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
+    /// - Returns: A  pair containing the key and value at the cursor's new position, or `nil` if not found.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
+    ///   You usually don't need to worry about this, unless you're using a decoder like `RawByteCoder` that exposes the buffer.
     /// - Note: If `target` is `.value`, the `key` returned will not be valid—only the `value` will be. If you need the key as well, use `get()`.
-    @discardableResult @inlinable @inline(__always)
-    public func get(_ position: AbsolutePosition, target: Target = .key) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
+    @discardableResult @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    public func get(_ position: AbsoluteCursorPosition, target: CursorTarget = .key) throws -> (key: KeyCoder.Output, value: ValueCoder.Output)? {
         let operation = switch (position, target) {
         case (.first, .key):   MDB_FIRST
         case (.first, .value): MDB_FIRST_DUP
@@ -133,7 +91,10 @@ extension Cursor {
         var value = MDB_val()
         return try LMDBError.nilIfNotFound {
             try LMDBError.check(mdb_cursor_get(unsafeHandle, &key, &value, operation))
-            return (key: .init(key), value: .init(value))
+            return try (
+                key: schema.keyCoder.decoding(.init(key)),
+                value: schema.valueCoder.decoding(.init(value))
+            )
         }
     }
     
@@ -142,11 +103,12 @@ extension Cursor {
     /// - Parameters:
     ///   - position: The relative position to move the cursor to.
     ///   - target: An optional target of the move operation, which can be `.key` or `.value`. If `nil`, the cursor moves to the next or previous entry without considering duplicates.
-    /// - Returns: A pair containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
+    /// - Returns: A pair containing the key and value at the cursor's new position, or `nil` if not found.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
-    @discardableResult @inlinable @inline(__always)
-    public func get(_ position: RelativePosition, target: Target? = nil) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
+    ///   You usually don't need to worry about this, unless you're using a decoder like `RawByteCoder` that exposes the buffer.
+    @discardableResult @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    public func get(_ position: RelativeCursorPosition, target: CursorTarget? = nil) throws -> (key: KeyCoder.Output, value: ValueCoder.Output)? {
         let operation = switch (position, target) {
         case (.next, nil):        MDB_NEXT
         case (.next, .key):       MDB_NEXT_NODUP
@@ -159,22 +121,26 @@ extension Cursor {
         var value = MDB_val()
         return try LMDBError.nilIfNotFound {
             try LMDBError.check(mdb_cursor_get(unsafeHandle, &key, &value, operation))
-            return (key: .init(key), value: .init(value))
+            return try (
+                key: schema.keyCoder.decoding(.init(key)),
+                value: schema.valueCoder.decoding(.init(value))
+            )
         }
     }
     
     /// Moves the cursor to a specified key, with an optional duplicate value, using the specified precision and retrieves the key and value at that position.
     ///
     /// - Parameters:
-    ///   - key: The key to move the cursor to, passed as `UnsafeRawBufferPointer`.
-    ///   - value: An optional duplicate value to move the cursor to, passed as `UnsafeRawBufferPointer`. If `nil`, only the key is considered.
+    ///   - key: The key to move the cursor to.
+    ///   - value: An optional duplicate value to move the cursor to. If `nil`, only the key is considered.
     ///   - precision: The precision of the move operation, either `.exactly` for an exact match or `.nearby` for the nearest match.
-    /// - Returns: A pair containing the key and value `UnsafeRawBufferPointer` at the cursor's new position, or `nil` if not found.
+    /// - Returns: A pair containing the key and value at the cursor's new position, or `nil` if not found.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
+    ///   You usually don't need to worry about this, unless you're using a decoder like `RawByteCoder` that exposes the buffer.
     /// - Note: The `value` is ingnored if precision is `exactly` and the database doesn't have duplicate values.
-    @discardableResult @inlinable @inline(__always)
-    public func get(atKey key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer? = nil, precision: Precision = .exactly) throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
+    @discardableResult @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    public func get(atKey key: KeyCoder.Input, value: ValueCoder.Input? = nil, precision: CursorPrecision = .exactly) throws -> (key: KeyCoder.Output, value: ValueCoder.Output)? {
         // FIXME: Clarify behavior if value is specified for non-DUPSORT database
         let operation = switch (precision, value) {
         case (.exactly, .none): MDB_SET_KEY
@@ -182,11 +148,18 @@ extension Cursor {
         case (.nearby, .none):  MDB_SET_RANGE
         case (.nearby, .some):  MDB_GET_BOTH_RANGE
         }
-        var key = MDB_val(.init(mutating: key))
-        var value = value.map { MDB_val(.init(mutating: $0)) } ?? .init()
-        return try LMDBError.nilIfNotFound {
-            try LMDBError.check(mdb_cursor_get(unsafeHandle, &key, &value, operation))
-            return (key: .init(key), value: .init(value))
+        return try schema.keyCoder.withEncoding(of: key) { key in
+            try schema.valueCoder.withEncodingOrNil(of: value) { value in
+                var key = MDB_val(.init(mutating: key))
+                var value = value.map { MDB_val(.init(mutating: $0)) } ?? .init()
+                return try LMDBError.nilIfNotFound {
+                    try LMDBError.check(mdb_cursor_get(unsafeHandle, &key, &value, operation))
+                    return try (
+                        key: schema.keyCoder.decoding(.init(key)),
+                        value: schema.valueCoder.decoding(.init(value))
+                    )
+                }
+            }
         }
     }
 }
@@ -194,32 +167,40 @@ extension Cursor {
 extension Cursor {
     /// Retrieves a key/data pair into the database at the cursor's current position.
     ///
-    /// - Returns: A pair containing the key and value `UnsafeRawBufferPointer` at the cursor's current position, or `nil` if not found.
+    /// - Returns: A pair containing the key and value at the cursor's current position, or `nil` if not found.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
-    @inlinable @inline(__always)
-    public func get() throws -> (key: UnsafeRawBufferPointer, value: UnsafeRawBufferPointer)? {
+    ///   You usually don't need to worry about this, unless you're using a decoder like `RawByteCoder` that exposes the buffer.
+    @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    public func get() throws -> (key: KeyCoder.Output, value: ValueCoder.Output)? {
         var key = MDB_val()
         var value = MDB_val()
         return try LMDBError.nilIfNotFound {
             try LMDBError.check(mdb_cursor_get(unsafeHandle, &key, &value, MDB_GET_CURRENT))
-            return (key: .init(key), value: .init(value))
+            return try (
+                key: schema.keyCoder.decoding(.init(key)),
+                value: schema.valueCoder.decoding(.init(value))
+            )
         }
     }
     
     /// Stores a key/data pair into the database, updating the cursor's position.
     ///
     /// - Parameters:
-    ///   - key: The key under which to store the data, passed as `UnsafeRawBufferPointer`.
-    ///   - value: The data to store, passed as `UnsafeRawBufferPointer`.
+    ///   - key: The key under which to store the data.
+    ///   - value: The data to store.
     ///   - overwrite: A Boolean value that determines whether to overwrite an existing value for a key. Defaults to `true`.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Precondition: The cursor's transaction must be a write transaction.
-    @inlinable @inline(__always)
-    public func put(_ value: UnsafeRawBufferPointer, atKey key: UnsafeRawBufferPointer, overwrite: Bool = true) throws {
-        var key = MDB_val(.init(mutating: key))
-        var value = MDB_val(.init(mutating: value))
-        try LMDBError.check(mdb_cursor_put(unsafeHandle, &key, &value, overwrite ? 0 : UInt32(MDB_NOOVERWRITE)))
+    @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    public func put(_ value: ValueCoder.Input, atKey key: KeyCoder.Input, overwrite: Bool = true) throws {
+        try schema.keyCoder.withEncoding(of: key) { key in
+            try schema.valueCoder.withEncoding(of: value) { value in
+                var key = MDB_val(.init(mutating: key))
+                var value = MDB_val(.init(mutating: value))
+                try LMDBError.check(mdb_cursor_put(unsafeHandle, &key, &value, overwrite ? 0 : UInt32(MDB_NOOVERWRITE)))
+            }
+        }
     }
     
     
@@ -231,7 +212,7 @@ extension Cursor {
     /// - Precondition: The transaction must be a write transaction.
     /// - Note: If the key does not exist in the database, the function will throw `LMDBError.notFound`.
     @inlinable @inline(__always)
-    public func delete(target: Target = .value) throws {
+    public func delete(target: CursorTarget = .value) throws {
         try LMDBError.check(mdb_cursor_del(unsafeHandle, UInt32(target == .key ? MDB_NODUPDATA : 0)))
     }
 }
@@ -257,8 +238,11 @@ extension Transaction {
     /// - Throws: An `LMDBError` if the cursor cannot be created, or any error thrown by the `block`.
     /// - Returns: The value returned by the `block`.
     @inlinable
-    public func withCursor<T>(for database: Database, _ block: (Cursor) throws -> T) throws -> T {
-        let cursor = try Cursor(for: database, in: self)
+    public func withCursor<T, KeyCoder: ByteCoder, ValueCoder: ByteCoder>(
+        for database: Database<KeyCoder, ValueCoder>,
+        _ block: (Cursor<KeyCoder, ValueCoder>) throws -> T
+    ) throws -> T {
+        let cursor = try Cursor<KeyCoder, ValueCoder>(for: database, schema: database.schema, in: self)
         defer { cursor.close() }
         return try block(cursor)
     }
