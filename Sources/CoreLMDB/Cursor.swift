@@ -24,11 +24,11 @@ public struct Cursor<KeyCoder: ByteCoder, ValueCoder: ByteCoder> {
     ///   If in a write transaction, the cursor may be closed before the transaction ends, but it will otherwise be closed automatically.
     ///   If in a read transaction, the cursor must be closed explicitly, but it doesn't need to be closed before the transaction ends.
     @inlinable @inline(__always)
-    public init(for database: Database, schema: Database.Schema, in transaction: Transaction) throws {
+    public init(for database: Database, in transaction: Transaction) throws {
         var cursor: OpaquePointer?
         try LMDBError.check(mdb_cursor_open(transaction.unsafeHandle, database.unsafeHandle, &cursor))
         self.unsafeHandle = cursor
-        self.schema = schema
+        self.schema = database.schema
     }
     
     /// Closes the cursor.
@@ -242,7 +242,7 @@ extension Transaction {
         for database: Database<KeyCoder, ValueCoder>,
         _ block: (Cursor<KeyCoder, ValueCoder>) throws -> T
     ) throws -> T {
-        let cursor = try Cursor<KeyCoder, ValueCoder>(for: database, schema: database.schema, in: self)
+        let cursor = try Cursor<KeyCoder, ValueCoder>(for: database, in: self)
         defer { cursor.close() }
         return try block(cursor)
     }

@@ -167,22 +167,23 @@ extension UnsafeRawBufferPointer {
 
 // MARK: Comparison
 
-extension Database {
-    public enum Ordering: Hashable, Sendable {
-        case descending
-        case equal
-        case ascending
-        
-        internal init(_ value: Int32) {
-            self = if value > 0 {
-                .descending
-            } else if value == 0 {
-                .equal
-            } else {
-                .ascending
-            }
+public enum Ordering: Hashable, Sendable {
+    case descending
+    case equal
+    case ascending
+    
+    internal init(_ value: Int32) {
+        self = if value > 0 {
+            .descending
+        } else if value == 0 {
+            .equal
+        } else {
+            .ascending
         }
     }
+}
+
+extension Database {
     public func keyOrdering(of lhs: KeyCoder.Input, _ rhs: KeyCoder.Input, in transaction: Transaction) throws -> Ordering {
         try schema.keyCoder.withEncoding(of: lhs) { lhs in
             try schema.keyCoder.withEncoding(of: rhs) { rhs in

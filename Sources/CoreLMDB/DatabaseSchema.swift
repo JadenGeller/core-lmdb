@@ -5,6 +5,11 @@ public struct DatabaseSchema<KeyCoder: ByteEncoder, ValueCoder: ByteCoder> {
     
     /// The `ByteCoder` to use to encode and decode values.
     public var valueCoder: ValueCoder
+    
+    public init(keyCoder: KeyCoder, valueCoder: ValueCoder) {
+        self.keyCoder = keyCoder
+        self.valueCoder = valueCoder
+    }
 }
 
 public typealias ByteCoder
