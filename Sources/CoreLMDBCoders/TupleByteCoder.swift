@@ -1,24 +1,24 @@
 import CoreLMDB
 
-struct TupleByteCoder<First, Second> {
+public struct TupleByteCoder<First, Second> {
     public var first: First
     public var second: Second
     
-    init(_ first: First, _ second: Second) {
+    public init(_ first: First, _ second: Second) {
         self.first = first
         self.second = second
     }
 }
 
 extension TupleByteCoder: ByteDecoder where First: BoundedByteDecoder, Second: ByteDecoder {
-    func decoding(_ buffer: UnsafeRawBufferPointer) throws -> (First.Output, Second.Output) {
+    public func decoding(_ buffer: UnsafeRawBufferPointer) throws -> (First.Output, Second.Output) {
         var buffer = buffer
         return (try first.decoding(&buffer), try second.decoding(buffer))
     }
 }
 
 extension TupleByteCoder: ByteEncoder where First: ByteEncoder, Second: ByteEncoder {
-    func withEncoding<Result>(of input: (First.Input, Second.Input), _ body: (UnsafeRawBufferPointer) throws -> Result) throws -> Result {
+    public func withEncoding<Result>(of input: (First.Input, Second.Input), _ body: (UnsafeRawBufferPointer) throws -> Result) throws -> Result {
         var bytes = ContiguousArray<UInt8>()
         try first.withEncoding(of: input.0) { bytes.append(contentsOf: $0) }
         try second.withEncoding(of: input.1) { bytes.append(contentsOf: $0) }
@@ -27,7 +27,7 @@ extension TupleByteCoder: ByteEncoder where First: ByteEncoder, Second: ByteEnco
 }
 
 extension TupleByteCoder: PrecountingByteEncoder where First: PrecountingByteEncoder, Second: PrecountingByteEncoder {
-    func withEncoding<Result>(of input: (First.Input, Second.Input), _ body: (UnsafeRawBufferPointer) throws -> Result) throws -> Result {
+    public func withEncoding<Result>(of input: (First.Input, Second.Input), _ body: (UnsafeRawBufferPointer) throws -> Result) throws -> Result {
         var bytes = ContiguousArray<UInt8>()
         bytes.reserveCapacity(underestimatedByteCount(for: input))
         try first.withEncoding(of: input.0) { bytes.append(contentsOf: $0) }
@@ -35,7 +35,7 @@ extension TupleByteCoder: PrecountingByteEncoder where First: PrecountingByteEnc
         return try bytes.withUnsafeBytes(body)
     }
     
-    func underestimatedByteCount(for input: (First.Input, Second.Input)) -> Int {
+    public func underestimatedByteCount(for input: (First.Input, Second.Input)) -> Int {
         first.underestimatedByteCount(for: input.0) + second.underestimatedByteCount(for: input.1)
     }
 }
