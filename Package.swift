@@ -14,8 +14,8 @@ let package = Package(
             targets: ["CoreLMDB"]
         ),
         .library(
-            name: "CoreLMDBRepresentable",
-            targets: ["CoreLMDBRepresentable"]
+            name: "CoreLMDBCoders",
+            targets: ["CoreLMDBCoders"]
         ),
         .library(
             name: "CoreLMDBCollections",
@@ -34,20 +34,20 @@ let package = Package(
             dependencies: ["CLMDB"]
         ),
         .target(
-            name: "CoreLMDBRepresentable",
+            name: "CoreLMDBCoders",
             dependencies: ["CoreLMDB"]
         ),
         .target(
             name: "CoreLMDBCollections",
-            dependencies: ["CoreLMDB", "CoreLMDBRepresentable"]
+            dependencies: ["CoreLMDB"]
         ),
         .testTarget(
             name: "CoreLMDBTests",
-            dependencies: ["CoreLMDB", "CoreLMDBRepresentable"]
+            dependencies: ["CoreLMDB", "CoreLMDBCoders"]
         ),
         .testTarget(
             name: "CoreLMDBCollectionsTests",
-            dependencies: ["CoreLMDBCollections"]
+            dependencies: ["CoreLMDBCollections", "CoreLMDBCoders"]
         ),
     ]
 )
