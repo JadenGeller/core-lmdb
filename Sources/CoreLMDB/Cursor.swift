@@ -7,11 +7,21 @@ public struct Cursor<KeyCoder: ByteCoder, ValueCoder: ByteCoder> {
     
     /// The underlying LMDB cursor handle.
     @usableFromInline
-    internal var unsafeHandle: OpaquePointer?
+    internal var unsafeHandle: OpaquePointer
     
     /// The `Schema` to use to encode and decode keys and values in the Database.
     public let schema: Database.Schema
 
+    /// Initializes an already open cursor from the given LMDB cursor handle.
+    ///
+    /// - Parameter unsafeHandle: An `OpaquePointer` representing the LMDB cursor handle.
+    /// - Parameter schema: The `Schema` to use to encode and decode keys and values.
+    @inlinable @inline(__always)
+    internal init(unsafeHandle: OpaquePointer, schema: Database.Schema) {
+        self.unsafeHandle = unsafeHandle
+        self.schema = schema
+    }
+    
     /// Creates a cursor for a given transaction and database.
     ///
     /// - Parameters:
@@ -27,8 +37,7 @@ public struct Cursor<KeyCoder: ByteCoder, ValueCoder: ByteCoder> {
     public init(for database: Database, in transaction: Transaction) throws {
         var cursor: OpaquePointer?
         try LMDBError.check(mdb_cursor_open(transaction.unsafeHandle, database.unsafeHandle, &cursor))
-        self.unsafeHandle = cursor
-        self.schema = database.schema
+        self.init(unsafeHandle: cursor!, schema: database.schema)
     }
     
     /// Closes the cursor.
@@ -251,5 +260,11 @@ extension Transaction {
 extension Cursor: Equatable {
     public static func ==(lhs: Cursor, rhs: Cursor) -> Bool {
         lhs.unsafeHandle == rhs.unsafeHandle
+    }
+}
+
+extension Cursor where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder {
+    public func bind<NewKeyCoder: ByteCoder, NewValueCoder: ByteCoder>(to schema: DatabaseSchema<NewKeyCoder, NewValueCoder>) -> Cursor<NewKeyCoder, NewValueCoder> {
+        .init(unsafeHandle: unsafeHandle, schema: schema)
     }
 }

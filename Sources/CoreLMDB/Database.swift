@@ -210,6 +210,12 @@ extension Database: Equatable {
     }
 }
 
+extension Database where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder {
+    public func bind<NewKeyCoder: ByteCoder, NewValueCoder: ByteCoder>(to schema: DatabaseSchema<NewKeyCoder, NewValueCoder>) -> Database<NewKeyCoder, NewValueCoder> {
+        .init(unsafeHandle: unsafeHandle, schema: schema)
+    }
+}
+
 // MARK: Utils
 
 extension Optional<String> {
