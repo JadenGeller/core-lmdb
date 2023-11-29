@@ -5,6 +5,10 @@ public protocol UnsafeMemoryLayoutStorable {}
 public struct UnsafeMemoryLayoutByteCoder<Element: UnsafeMemoryLayoutStorable>: FixedSizeBoundedByteDecoder, PrecountingByteEncoder {
     var count: Int
     
+    public init(count: Int) {
+        self.count = count
+    }
+    
     public var byteCount: Int {
         count * MemoryLayout<Element>.size
     }
