@@ -2,7 +2,7 @@ import CoreLMDB
 
 public protocol UnsafeMemoryLayoutStorable {}
 
-public struct UnsafeMemoryByteCoder<Element: UnsafeMemoryLayoutStorable>: FixedSizeBoundedByteDecoder, PrecountingByteEncoder {
+public struct UnsafeMemoryLayoutByteCoder<Element: UnsafeMemoryLayoutStorable>: FixedSizeBoundedByteDecoder, PrecountingByteEncoder {
     var count: Int
     
     public var byteCount: Int {
