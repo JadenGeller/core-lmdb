@@ -2,7 +2,7 @@ import CoreLMDB
 
 public protocol UnsafeMemoryLayoutStorable {}
 
-public struct UnsafeMemoryLayoutByteCoder<Element: UnsafeMemoryLayoutStorable>: FixedSizeBoundedByteDecoder, PrecountingByteEncoder {
+public struct UnsafeMemoryLayoutVectorByteCoder<Element: UnsafeMemoryLayoutStorable>: FixedSizeBoundedByteDecoder, PrecountingByteEncoder {
     var count: Int
     
     public init(count: Int) {
@@ -13,6 +13,18 @@ public struct UnsafeMemoryLayoutByteCoder<Element: UnsafeMemoryLayoutStorable>: 
         count * MemoryLayout<Element>.size
     }
     
+    public func decoding(_ buffer: UnsafeRawBufferPointer) throws -> [Element] {
+        Array(buffer.bindMemory(to: Element.self))
+    }
+    
+    public func withEncoding<Result>(of input: [Element], _ body: (UnsafeRawBufferPointer) throws -> Result) throws -> Result {
+        try input.withUnsafeBytes(body)
+    }
+}
+
+public struct UnsafeMemoryLayoutArrayByteCoder<Element: UnsafeMemoryLayoutStorable>: ByteCoder {
+    public init() { }
+        
     public func decoding(_ buffer: UnsafeRawBufferPointer) throws -> [Element] {
         Array(buffer.bindMemory(to: Element.self))
     }
