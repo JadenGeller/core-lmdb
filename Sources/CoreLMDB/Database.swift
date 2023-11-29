@@ -216,6 +216,8 @@ extension Database where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder {
     }
 }
 
+public typealias RawDatabase = Database<RawByteCoder, RawByteCoder>
+
 // MARK: Utils
 
 extension Optional<String> {

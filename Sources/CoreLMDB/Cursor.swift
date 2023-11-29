@@ -268,3 +268,5 @@ extension Cursor where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder {
         .init(unsafeHandle: unsafeHandle, schema: schema)
     }
 }
+
+public typealias RawCursor = Cursor<RawByteCoder, RawByteCoder>
