@@ -41,12 +41,31 @@ public struct RawByteCoder {
 
 extension RawByteCoder: ByteEncoder {
     @inlinable @inline(__always)
+    public func withEncoding<Result>(of input: ContiguousArray<UInt8>, _ body: (UnsafeRawBufferPointer) throws -> Result) throws -> Result {
+        try input.withUnsafeBytes(body)
+    }
+}
+
+extension RawByteCoder: ByteDecoder {
+    @inlinable @inline(__always)
+    public func decoding(_ buffer: UnsafeRawBufferPointer) -> ContiguousArray<UInt8> {
+        .init(buffer)
+    }
+}
+
+public struct RawBytePointerCoder {
+    @inlinable @inline(__always)
+    public init() {}
+}
+
+extension RawBytePointerCoder: ByteEncoder {
+    @inlinable @inline(__always)
     public func withEncoding<Result>(of input: UnsafeRawBufferPointer, _ body: (UnsafeRawBufferPointer) throws -> Result) throws -> Result {
         try body(input)
     }
 }
 
-extension RawByteCoder: ByteDecoder {
+extension RawBytePointerCoder: ByteDecoder {
     @inlinable @inline(__always)
     public func decoding(_ buffer: UnsafeRawBufferPointer) -> UnsafeRawBufferPointer {
         buffer

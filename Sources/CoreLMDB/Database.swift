@@ -102,7 +102,7 @@ extension Database {
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     ///   You usually don't need to worry about this, unless you're using a decoder like `RawByteCoder` that exposes the buffer.
-    @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    @inlinable @inline(__always)
     public func get(atKey key: KeyCoder.Input, in transaction: Transaction) throws -> ValueCoder.Output? {
         try schema.keyCoder.withEncoding(of: key) { key in
             var key = MDB_val(.init(mutating: key))
@@ -124,7 +124,7 @@ extension Database {
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Precondition: The transaction must be a write transaction.
     /// - Note: If `overwrite` is set to `false` and the key already exists, the function will throw `LMDBError.keyExist`.
-    @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    @inlinable @inline(__always)
     public func put(_ value: ValueCoder.Input, atKey key: KeyCoder.Input, overwrite: Bool = true, in transaction: Transaction) throws {
         try schema.keyCoder.withEncoding(of: key) { key in
             try schema.valueCoder.withEncoding(of: value) { value in
@@ -144,7 +144,7 @@ extension Database {
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Precondition: The transaction must be a write transaction.
     /// - Note: If the key does not exist in the database, the function will throw `LMDBError.notFound`.
-    @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    @inlinable @inline(__always)
     public func delete(atKey key: KeyCoder.Input, value: ValueCoder.Input? = nil, in transaction: Transaction) throws {
         // FIXME: Clarify behavior if value is specified for non-DUPSORT database
         try schema.keyCoder.withEncoding(of: key) { key in
@@ -217,13 +217,14 @@ extension Database: Equatable {
     }
 }
 
-extension Database where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder {
-    public func bind<NewKeyCoder: ByteCoder, NewValueCoder: ByteCoder>(to schema: DatabaseSchema<NewKeyCoder, NewValueCoder>) -> Database<NewKeyCoder, NewValueCoder> {
+extension Database {
+    public func rebind<NewKeyCoder: ByteCoder, NewValueCoder: ByteCoder>(to schema: DatabaseSchema<NewKeyCoder, NewValueCoder>) -> Database<NewKeyCoder, NewValueCoder> {
         .init(unsafeHandle: unsafeHandle, schema: schema)
     }
 }
 
 public typealias RawDatabase = Database<RawByteCoder, RawByteCoder>
+public typealias RawPointerDatabase = Database<RawBytePointerCoder, RawBytePointerCoder>
 
 // MARK: Utils
 

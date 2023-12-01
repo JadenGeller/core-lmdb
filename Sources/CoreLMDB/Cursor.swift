@@ -88,7 +88,7 @@ extension Cursor {
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     ///   You usually don't need to worry about this, unless you're using a decoder like `RawByteCoder` that exposes the buffer.
     /// - Note: If `target` is `.value`, the `key` returned will not be valid—only the `value` will be. If you need the key as well, use `get()`.
-    @discardableResult @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    @discardableResult @inlinable @inline(__always)
     public func get(_ position: AbsoluteCursorPosition, target: CursorTarget = .key) throws -> (key: KeyCoder.Output, value: ValueCoder.Output)? {
         let operation = switch (position, target) {
         case (.first, .key):   MDB_FIRST
@@ -116,7 +116,7 @@ extension Cursor {
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     ///   You usually don't need to worry about this, unless you're using a decoder like `RawByteCoder` that exposes the buffer.
-    @discardableResult @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    @discardableResult @inlinable @inline(__always)
     public func get(_ position: RelativeCursorPosition, target: CursorTarget? = nil) throws -> (key: KeyCoder.Output, value: ValueCoder.Output)? {
         let operation = switch (position, target) {
         case (.next, nil):        MDB_NEXT
@@ -148,7 +148,7 @@ extension Cursor {
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     ///   You usually don't need to worry about this, unless you're using a decoder like `RawByteCoder` that exposes the buffer.
     /// - Note: The `value` is ingnored if precision is `exactly` and the database doesn't have duplicate values.
-    @discardableResult @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    @discardableResult @inlinable @inline(__always)
     public func get(atKey key: KeyCoder.Input, value: ValueCoder.Input? = nil, precision: CursorPrecision = .exactly) throws -> (key: KeyCoder.Output, value: ValueCoder.Output)? {
         // FIXME: Clarify behavior if value is specified for non-DUPSORT database
         let operation = switch (precision, value) {
@@ -180,7 +180,7 @@ extension Cursor {
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Warning: The returned buffer pointer is owned by the database and only valid until the next update operation or the end of the transaction. Do not deallocate.
     ///   You usually don't need to worry about this, unless you're using a decoder like `RawByteCoder` that exposes the buffer.
-    @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    @inlinable @inline(__always)
     public func get() throws -> (key: KeyCoder.Output, value: ValueCoder.Output)? {
         var key = MDB_val()
         var value = MDB_val()
@@ -201,7 +201,7 @@ extension Cursor {
     ///   - overwrite: A Boolean value that determines whether to overwrite an existing value for a key. Defaults to `true`.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Precondition: The cursor's transaction must be a write transaction.
-    @inlinable @inline(__always) @_specialize(where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder)
+    @inlinable @inline(__always)
     public func put(_ value: ValueCoder.Input, atKey key: KeyCoder.Input, overwrite: Bool = true) throws {
         try schema.keyCoder.withEncoding(of: key) { key in
             try schema.valueCoder.withEncoding(of: value) { value in
@@ -263,10 +263,11 @@ extension Cursor: Equatable {
     }
 }
 
-extension Cursor where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder {
-    public func bind<NewKeyCoder: ByteCoder, NewValueCoder: ByteCoder>(to schema: DatabaseSchema<NewKeyCoder, NewValueCoder>) -> Cursor<NewKeyCoder, NewValueCoder> {
+extension Cursor {
+    public func rebind<NewKeyCoder: ByteCoder, NewValueCoder: ByteCoder>(to schema: DatabaseSchema<NewKeyCoder, NewValueCoder>) -> Cursor<NewKeyCoder, NewValueCoder> {
         .init(unsafeHandle: unsafeHandle, schema: schema)
     }
 }
 
 public typealias RawCursor = Cursor<RawByteCoder, RawByteCoder>
+public typealias RawPointerCursor = Cursor<RawBytePointerCoder, RawBytePointerCoder>

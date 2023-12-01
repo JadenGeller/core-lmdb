@@ -14,6 +14,10 @@ let package = Package(
             targets: ["CoreLMDB"]
         ),
         .library(
+            name: "CoreLMDBCells",
+            targets: ["CoreLMDBCells"]
+        ),
+        .library(
             name: "CoreLMDBCoders",
             targets: ["CoreLMDBCoders"]
         ),
@@ -32,6 +36,10 @@ let package = Package(
         .target(
             name: "CoreLMDB",
             dependencies: ["CLMDB"]
+        ),
+        .target(
+            name: "CoreLMDBCells",
+            dependencies: ["CoreLMDB"]
         ),
         .target(
             name: "CoreLMDBCoders",
