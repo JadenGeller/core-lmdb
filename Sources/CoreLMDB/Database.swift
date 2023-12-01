@@ -83,6 +83,13 @@ public struct Database<KeyCoder: ByteEncoder, ValueCoder: ByteCoder> {
     }
 }
 
+extension Database where KeyCoder == RawByteCoder, ValueCoder == RawByteCoder {
+    @inlinable @inline(__always)
+    public static func `open`(_ name: String? = nil, config: DatabaseConfig = .init(), in transaction: Transaction) throws -> Self {
+        try .open(name, config: config, schema: .init(keyCoder: RawByteCoder(), valueCoder: ValueCoder()), in: transaction)
+    }
+}
+
 // MARK: Accessors
 
 extension Database {
