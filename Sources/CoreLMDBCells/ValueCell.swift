@@ -32,3 +32,12 @@ public struct SingleValueCell<ValueCoder: ByteCoder> {
         try database.delete(atKey: key, in: transaction)
     }
 }
+
+typealias RawSingleValueCell = SingleValueCell<RawByteCoder>
+
+extension SingleValueCell {
+    public func rebind<NewValueCoder: ByteCoder>(to valueCoder: NewValueCoder) -> SingleValueCell<NewValueCoder> {
+        // cannot fail since RawByteCoder does not fail
+        try! .init(atKey: key, for: database.rebind(to: .init(keyCoder: RawByteCoder(), valueCoder: valueCoder)), in: transaction)
+    }
+}

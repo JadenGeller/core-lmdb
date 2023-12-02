@@ -224,7 +224,6 @@ extension Database {
 }
 
 public typealias RawDatabase = Database<RawByteCoder, RawByteCoder>
-public typealias RawPointerDatabase = Database<RawBytePointerCoder, RawBytePointerCoder>
 
 // MARK: Utils
 

@@ -270,4 +270,3 @@ extension Cursor {
 }
 
 public typealias RawCursor = Cursor<RawByteCoder, RawByteCoder>
-public typealias RawPointerCursor = Cursor<RawBytePointerCoder, RawBytePointerCoder>
