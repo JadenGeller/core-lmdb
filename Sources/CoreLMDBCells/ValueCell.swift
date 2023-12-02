@@ -33,7 +33,7 @@ public struct SingleValueCell<ValueCoder: ByteCoder> {
     }
 }
 
-typealias RawSingleValueCell = SingleValueCell<RawByteCoder>
+public typealias RawSingleValueCell = SingleValueCell<RawByteCoder>
 
 extension SingleValueCell {
     public func rebind<NewValueCoder: ByteCoder>(to valueCoder: NewValueCoder) -> SingleValueCell<NewValueCoder> {
