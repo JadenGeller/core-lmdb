@@ -6,7 +6,7 @@ public struct MapInputByteCoder<Base: ByteEncoder, Input>: ByteEncoder {
     var base: Base
     var transform: (Input) throws -> Base.Input
     
-    public init(_ base: Base, _ transform: @escaping (Input) throws -> Base.Input) {
+    internal init(_ base: Base, _ transform: @escaping (Input) throws -> Base.Input) {
         self.base = base
         self.transform = transform
     }
@@ -45,13 +45,19 @@ extension MapInputByteCoder: FixedSizeBoundedByteDecoder where Base: FixedSizeBo
     }
 }
 
+extension ByteEncoder {
+    public func mapInput<NewInput>(_ transform: @escaping (NewInput) throws -> Input) -> MapInputByteCoder<Self, NewInput> {
+        .init(self, transform)
+    }
+}
+
 // MARK: Output
 
 public struct MapOutputByteCoder<Base: ByteDecoder, Output>: ByteDecoder {
     var base: Base
     var transform: (Base.Output) throws -> Output
     
-    public init(_ base: Base, _ transform: @escaping (Base.Output) throws -> Output) {
+    internal init(_ base: Base, _ transform: @escaping (Base.Output) throws -> Output) {
         self.base = base
         self.transform = transform
     }
@@ -74,5 +80,11 @@ extension MapOutputByteCoder: BoundedByteDecoder where Base: BoundedByteDecoder 
 extension MapOutputByteCoder: FixedSizeBoundedByteDecoder where Base: FixedSizeBoundedByteDecoder {
     public var byteCount: Int {
         base.byteCount
+    }
+}
+
+extension ByteDecoder {
+    public func mapOutput<NewOutput>(_ transform: @escaping (Output) throws -> NewOutput) -> MapOutputByteCoder<Self, NewOutput> {
+        .init(self, transform)
     }
 }
