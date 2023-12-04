@@ -22,8 +22,6 @@ extension MapInputByteCoder: PrecountingByteEncoder where Base: PrecountingByteE
 }
 
 extension MapInputByteCoder: ByteDecoder where Base: ByteDecoder {
-    public typealias Output = Base.Output
-    
     public func decoding(_ buffer: UnsafeRawBufferPointer) throws -> Base.Output {
         try base.decoding(buffer)
     }
@@ -80,6 +78,18 @@ extension MapOutputByteCoder: BoundedByteDecoder where Base: BoundedByteDecoder 
 extension MapOutputByteCoder: FixedSizeBoundedByteDecoder where Base: FixedSizeBoundedByteDecoder {
     public var byteCount: Int {
         base.byteCount
+    }
+}
+
+extension MapOutputByteCoder: ByteEncoder where Base: ByteEncoder {
+    public func withEncoding<Result>(of input: Base.Input, _ body: (UnsafeRawBufferPointer) throws -> Result) throws -> Result {
+        try base.withEncoding(of: input, body)
+    }
+}
+
+extension MapOutputByteCoder: PrecountingByteEncoder where Base: PrecountingByteEncoder {
+    public func underestimatedByteCount(for input: Base.Input) throws -> Int {
+        try base.underestimatedByteCount(for: input)
     }
 }
 
