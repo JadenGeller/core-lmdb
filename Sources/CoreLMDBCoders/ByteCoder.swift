@@ -38,7 +38,7 @@ extension DynamicSizeBoundedByteDecoder {
 // MARK: Encoding
 
 public protocol PrecountingByteEncoder: ByteEncoder {
-    func underestimatedByteCount(for input: Input) -> Int
+    func underestimatedByteCount(for input: Input) throws -> Int
 }
 
 extension PrecountingByteEncoder {
