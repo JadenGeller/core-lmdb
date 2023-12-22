@@ -28,6 +28,7 @@ let package = Package(
     ],
     dependencies: [
         .package(
+            // FIXME: I'd like to depend on the Apple fork, but it doesn't have any tagged releases.
             url:"https://github.com/tannerdsilva/CLMDB.git",
             exact: "0.9.31"
         ),

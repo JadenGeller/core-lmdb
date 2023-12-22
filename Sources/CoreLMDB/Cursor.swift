@@ -221,7 +221,7 @@ extension Cursor {
     /// - Precondition: The transaction must be a write transaction.
     /// - Note: If the key does not exist in the database, the function will throw `LMDBError.notFound`.
     @inlinable @inline(__always)
-    public func delete(target: CursorTarget = .value) throws {
+    public func delete(target: CursorTarget? = nil) throws {
         try LMDBError.check(mdb_cursor_del(unsafeHandle, UInt32(target == .key ? MDB_NODUPDATA : 0)))
     }
 }
