@@ -1,3 +1,18 @@
+import CLMDB
+
+public enum PutPrecondition {
+    case uniqueKey
+    case uniqueKeyValue
+    
+    @inlinable
+    internal var rawValue: UInt32 {
+        switch self {
+        case .uniqueKey: UInt32(MDB_NOOVERWRITE)
+        case .uniqueKeyValue: UInt32(MDB_NODUPDATA)
+        }
+    }
+}
+
 /// Represents the absolute position to which a cursor can move.
 public enum AbsoluteCursorPosition {
     /// Moves the cursor to the first key or first duplicate of the current key, depending on `Target`.

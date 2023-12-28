@@ -113,24 +113,24 @@ extension Database {
             }
         }
     }
-
+    
     /// Stores a key/data pair in the database within a transaction.
     ///
     /// - Parameters:
     ///   - value: The data to store.
     ///   - key: The key under which to store the data.
-    ///   - overwrite: A Boolean value that determines whether to overwrite an existing value for a key. Defaults to `false`.
+    ///   - precondition: The behavior to use if the database already contains the key (or in the case of DUPSORT, the value as well).
     ///   - transaction: The transaction within which the data storage should occur.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Precondition: The transaction must be a write transaction.
     /// - Note: If `overwrite` is set to `false` and the key already exists, the function will throw `LMDBError.keyExist`.
     @inlinable @inline(__always)
-    public func put(_ value: ValueCoder.Input, atKey key: KeyCoder.Input, overwrite: Bool = false, in transaction: Transaction) throws {
+    public func put(_ value: ValueCoder.Input, atKey key: KeyCoder.Input, precondition: PutPrecondition?, in transaction: Transaction) throws {
         try schema.keyCoder.withEncoding(of: key) { key in
             try schema.valueCoder.withEncoding(of: value) { value in
                 var key = MDB_val(.init(mutating: key))
                 var value = MDB_val(.init(mutating: value))
-                try LMDBError.check(mdb_put(transaction.unsafeHandle, unsafeHandle, &key, &value, overwrite ? 0 : UInt32(MDB_NOOVERWRITE)))
+                try LMDBError.check(mdb_put(transaction.unsafeHandle, unsafeHandle, &key, &value, precondition?.rawValue ?? 0))
             }
         }
     }
