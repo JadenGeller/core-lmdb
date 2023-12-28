@@ -202,7 +202,7 @@ extension Cursor {
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Precondition: The cursor's transaction must be a write transaction.
     @inlinable @inline(__always)
-    public func put(_ value: ValueCoder.Input, atKey key: KeyCoder.Input, overwrite: Bool = true) throws {
+    public func put(_ value: ValueCoder.Input, atKey key: KeyCoder.Input, overwrite: Bool) throws {
         try schema.keyCoder.withEncoding(of: key) { key in
             try schema.valueCoder.withEncoding(of: value) { value in
                 var key = MDB_val(.init(mutating: key))
@@ -222,6 +222,7 @@ extension Cursor {
     /// - Note: If the key does not exist in the database, the function will throw `LMDBError.notFound`.
     @inlinable @inline(__always)
     public func delete(target: CursorTarget = .key) throws {
+        // FIXME: It's unclear whether MDB_NODUPDATA deletes all values for key or just identical ones
         try LMDBError.check(mdb_cursor_del(unsafeHandle, UInt32(target == .key ? MDB_NODUPDATA : 0)))
     }
 }
