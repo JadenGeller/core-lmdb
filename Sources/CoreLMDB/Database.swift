@@ -119,13 +119,13 @@ extension Database {
     /// - Parameters:
     ///   - value: The data to store.
     ///   - key: The key under which to store the data.
-    ///   - overwrite: A Boolean value that determines whether to overwrite an existing value for a key. Defaults to `true`.
+    ///   - overwrite: A Boolean value that determines whether to overwrite an existing value for a key. Defaults to `false`.
     ///   - transaction: The transaction within which the data storage should occur.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Precondition: The transaction must be a write transaction.
     /// - Note: If `overwrite` is set to `false` and the key already exists, the function will throw `LMDBError.keyExist`.
     @inlinable @inline(__always)
-    public func put(_ value: ValueCoder.Input, atKey key: KeyCoder.Input, overwrite: Bool = true, in transaction: Transaction) throws {
+    public func put(_ value: ValueCoder.Input, atKey key: KeyCoder.Input, overwrite: Bool = false, in transaction: Transaction) throws {
         try schema.keyCoder.withEncoding(of: key) { key in
             try schema.valueCoder.withEncoding(of: value) { value in
                 var key = MDB_val(.init(mutating: key))

@@ -198,11 +198,11 @@ extension Cursor {
     /// - Parameters:
     ///   - key: The key under which to store the data.
     ///   - value: The data to store.
-    ///   - overwrite: A Boolean value that determines whether to overwrite an existing value for a key. Defaults to `true`.
+    ///   - overwrite: A Boolean value that determines whether to overwrite an existing value for a key. Defaults to `false`.
     /// - Throws: An `LMDBError` if the operation fails.
     /// - Precondition: The cursor's transaction must be a write transaction.
     @inlinable @inline(__always)
-    public func put(_ value: ValueCoder.Input, atKey key: KeyCoder.Input, overwrite: Bool) throws {
+    public func put(_ value: ValueCoder.Input, atKey key: KeyCoder.Input, overwrite: Bool = false) throws {
         try schema.keyCoder.withEncoding(of: key) { key in
             try schema.valueCoder.withEncoding(of: value) { value in
                 var key = MDB_val(.init(mutating: key))
