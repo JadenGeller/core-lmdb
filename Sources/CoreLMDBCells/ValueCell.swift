@@ -24,7 +24,7 @@ public struct SingleValueCell<ValueCoder: ByteCoder> {
 
     @inlinable @inline(__always)
     public func put(_ value: ValueCoder.Input) throws {
-        try database.put(value, atKey: key, overwrite: true, in: transaction)
+        try database.put(value, atKey: key, precondition: nil, in: transaction)
     }
     
     @inlinable @inline(__always)
