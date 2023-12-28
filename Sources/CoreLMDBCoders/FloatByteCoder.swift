@@ -1,7 +1,6 @@
 import CoreLMDB
 
 public protocol UnsafeMemoryLayoutStorableFloat: BinaryFloatingPoint, UnsafeMemoryLayoutStorable {}
-extension Float16: UnsafeMemoryLayoutStorableFloat {}
 extension Float32: UnsafeMemoryLayoutStorableFloat {}
 extension Float64: UnsafeMemoryLayoutStorableFloat {}
 
