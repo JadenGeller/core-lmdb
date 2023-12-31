@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "core-lmdb",
     platforms: [
-        .iOS(.v14),
+        .iOS(.v15),
         .macOS(.v12)
     ],
     products: [
