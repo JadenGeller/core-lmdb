@@ -28,15 +28,14 @@ let package = Package(
     ],
     dependencies: [
         .package(
-            // FIXME: I'd like to depend on the Apple fork, but it doesn't have any tagged releases.
-            url:"https://github.com/tannerdsilva/CLMDB.git",
-            exact: "0.9.31"
+            url: "https://github.com/JadenGeller/swift-lmdb",
+            exact: "0.1.2"
         ),
     ],
     targets: [
         .target(
             name: "CoreLMDB",
-            dependencies: ["CLMDB"]
+            dependencies: [.product(name: "CLMDB", package: "swift-lmdb")]
         ),
         .target(
             name: "CoreLMDBCells",
